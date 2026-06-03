@@ -19,6 +19,8 @@ const schema = Joi.object({
 
   FRONTEND_URL: Joi.string().default('http://localhost:4200'),
 
+  META_API_VERSION: Joi.string().default('v22.0'),
+
   GEMINI_API_KEY: Joi.string().allow('').optional(),
   OPENAI_API_KEY: Joi.string().allow('').optional(),
   ANTHROPIC_API_KEY: Joi.string().allow('').optional(),
@@ -49,6 +51,10 @@ export const envs = {
 
   encryptionKey: value.ENCRYPTION_KEY as string,
   frontendUrl: value.FRONTEND_URL as string,
+
+  meta: {
+    apiVersion: value.META_API_VERSION as string,
+  },
 
   ai: {
     geminiApiKey: value.GEMINI_API_KEY as string,

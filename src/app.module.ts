@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from './database/database.module';
-import { SessionModule } from './whatsapp/session/session.module';
+import { CredentialsModule } from './whatsapp/credentials/credentials.module';
 import { MessagingModule } from './whatsapp/messaging/messaging.module';
 import { IncomingModule } from './whatsapp/incoming/incoming.module';
 import { WebhookModule } from './whatsapp/webhook/webhook.module';
@@ -20,7 +20,7 @@ import { envs } from './config/envs';
     }),
     DatabaseModule,
     GatewayModule,
-    SessionModule,
+    CredentialsModule,
     MessagingModule,
     IncomingModule,
     WebhookModule,

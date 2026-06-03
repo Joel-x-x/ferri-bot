@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { proto } from '@whiskeysockets/baileys';
 import axios from 'axios';
 import {
   MessageHistory,
@@ -9,11 +8,9 @@ import {
   MessageType,
   MessageStatus,
 } from '../../database/entities/message-history.entity';
-import { SessionService } from '../session/session.service';
+import { CredentialsService } from '../credentials/credentials.service';
 import { WhatsappGateway } from '../gateway/whatsapp.gateway';
-import {
-  SendTextDto,
-} from './dto/send-text.dto';
+import { SendTextDto } from './dto/send-text.dto';
 import {
   SendImageDto,
   SendAudioDto,
@@ -23,8 +20,10 @@ import {
   SendReactionDto,
 } from './dto/send-media.dto';
 import { SendBulkDto } from './dto/send-bulk.dto';
+import { envs } from '../../config/envs';
 
 const RATE_LIMIT_MS = 1000;
+const GRAPH_URL = `https://graph.facebook.com/${envs.meta.apiVersion}`;
 
 @Injectable()
 export class MessagingService {
@@ -33,18 +32,24 @@ export class MessagingService {
   constructor(
     @InjectRepository(MessageHistory)
     private readonly messageRepo: Repository<MessageHistory>,
-    private readonly sessionService: SessionService,
+    private readonly credentialsService: CredentialsService,
     private readonly gateway: WhatsappGateway,
   ) {}
 
-  private normalizeJid(to: string): string {
-    if (to.includes('@')) return to;
-    return `${to}@s.whatsapp.net`;
+  private async graphPost(phoneNumberId: string, accessToken: string, body: object): Promise<string> {
+    const url = `${GRAPH_URL}/${phoneNumberId}/messages`;
+    const { data } = await axios.post(url, body, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return data?.messages?.[0]?.id ?? '';
   }
 
   private async saveOutbound(
     tenantId: string,
-    jid: string,
+    to: string,
     messageId: string,
     type: MessageType,
     content?: string,
@@ -53,7 +58,7 @@ export class MessagingService {
   ): Promise<void> {
     await this.messageRepo.save({
       tenantId,
-      jid,
+      jid: to,
       messageId,
       direction: MessageDirection.OUTBOUND,
       type,
@@ -65,98 +70,93 @@ export class MessagingService {
   }
 
   async sendText(tenantId: string, dto: SendTextDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const result = await sock.sendMessage(jid, { text: dto.text });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.TEXT, dto.text);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'text',
+      text: { body: dto.text },
+    });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.TEXT, dto.text);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendImage(tenantId: string, dto: SendImageDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const { data } = await axios.get(dto.url, { responseType: 'arraybuffer' });
-    const result = await sock.sendMessage(jid, {
-      image: Buffer.from(data),
-      caption: dto.caption,
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'image',
+      image: { link: dto.url, caption: dto.caption },
     });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.IMAGE, dto.caption, dto.url);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.IMAGE, dto.caption, dto.url);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendAudio(tenantId: string, dto: SendAudioDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const { data } = await axios.get(dto.url, { responseType: 'arraybuffer' });
-    const result = await sock.sendMessage(jid, {
-      audio: Buffer.from(data),
-      mimetype: 'audio/mp4',
-      ptt: dto.ptt ?? false,
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'audio',
+      audio: { link: dto.url },
     });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.AUDIO, undefined, dto.url);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.AUDIO, undefined, dto.url);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendVideo(tenantId: string, dto: SendVideoDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const { data } = await axios.get(dto.url, { responseType: 'arraybuffer' });
-    const result = await sock.sendMessage(jid, {
-      video: Buffer.from(data),
-      caption: dto.caption,
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'video',
+      video: { link: dto.url, caption: dto.caption },
     });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.VIDEO, dto.caption, dto.url);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.VIDEO, dto.caption, dto.url);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendDocument(tenantId: string, dto: SendDocumentDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const { data } = await axios.get(dto.url, { responseType: 'arraybuffer' });
-    const result = await sock.sendMessage(jid, {
-      document: Buffer.from(data),
-      mimetype: dto.mimetype,
-      fileName: dto.filename,
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'document',
+      document: { link: dto.url, filename: dto.filename },
     });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.DOCUMENT, dto.filename, dto.url);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.DOCUMENT, dto.filename, dto.url);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendReply(tenantId: string, dto: SendReplyDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const quoted: proto.IWebMessageInfo = {
-      key: { remoteJid: jid, id: dto.quotedMessageId },
-      message: { conversation: '' },
-    };
-    const result = await sock.sendMessage(jid, { text: dto.text }, { quoted });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.TEXT, dto.text, undefined, dto.quotedMessageId);
-    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, jid, messageId, status: 'SENT' });
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      context: { message_id: dto.quotedMessageId },
+      type: 'text',
+      text: { body: dto.text },
+    });
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.TEXT, dto.text, undefined, dto.quotedMessageId);
+    this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: dto.to, messageId, status: 'SENT' });
     return { messageId };
   }
 
   async sendReaction(tenantId: string, dto: SendReactionDto): Promise<{ messageId: string }> {
-    const sock = this.sessionService.getSocket(tenantId);
-    const jid = this.normalizeJid(dto.to);
-    const result = await sock.sendMessage(jid, {
-      react: {
-        text: dto.emoji,
-        key: { remoteJid: jid, id: dto.messageId },
-      },
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
+    const messageId = await this.graphPost(phoneNumberId, accessToken, {
+      messaging_product: 'whatsapp',
+      to: dto.to,
+      type: 'reaction',
+      reaction: { message_id: dto.messageId, emoji: dto.emoji },
     });
-    const messageId = result?.key?.id ?? '';
-    await this.saveOutbound(tenantId, jid, messageId, MessageType.REACTION, dto.emoji);
+    await this.saveOutbound(tenantId, dto.to, messageId, MessageType.REACTION, dto.emoji);
     return { messageId };
   }
 
@@ -184,9 +184,8 @@ export class MessagingService {
     page = 1,
     limit = 20,
   ): Promise<{ data: MessageHistory[]; total: number; page: number; limit: number }> {
-    const normalizedJid = this.normalizeJid(jid);
     const [data, total] = await this.messageRepo.findAndCount({
-      where: { tenantId, jid: normalizedJid },
+      where: { tenantId, jid },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -196,7 +195,7 @@ export class MessagingService {
 
   async saveInbound(
     tenantId: string,
-    jid: string,
+    from: string,
     messageId: string,
     type: MessageType,
     content?: string,
@@ -205,7 +204,7 @@ export class MessagingService {
   ): Promise<void> {
     await this.messageRepo.save({
       tenantId,
-      jid,
+      jid: from,
       messageId,
       direction: MessageDirection.INBOUND,
       type,
@@ -214,5 +213,9 @@ export class MessagingService {
       status: MessageStatus.READ,
       aiProcessed,
     });
+  }
+
+  async updateMessageStatus(tenantId: string, messageId: string, status: MessageStatus): Promise<void> {
+    await this.messageRepo.update({ tenantId, messageId }, { status });
   }
 }
