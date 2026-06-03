@@ -14,7 +14,7 @@ export enum AiProviderType {
 }
 
 @Entity('ai_providers')
-export class AiProvider {
+export class AiProviderEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

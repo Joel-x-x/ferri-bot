@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
 import axios from 'axios';
-import { WebhookSubscription } from '../../database/entities/webhook-subscription.entity';
+import { WebhookSubscriptionEntityEntity } from '../../database/entities/webhook-subscription.entity';
 import { CreateWebhookRequest, UpdateWebhookRequest } from './dto/webhook.dto';
 
 @Injectable()
@@ -11,19 +11,19 @@ export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
 
   constructor(
-    @InjectRepository(WebhookSubscription)
-    private readonly webhookRepo: Repository<WebhookSubscription>,
+    @InjectRepository(WebhookSubscriptionEntity)
+    private readonly webhookRepo: Repository<WebhookSubscriptionEntity>,
   ) {}
 
-  async create(tenantId: string, dto: CreateWebhookRequest): Promise<WebhookSubscription> {
+  async create(tenantId: string, dto: CreateWebhookRequest): Promise<WebhookSubscriptionEntity> {
     return this.webhookRepo.save({ ...dto, tenantId });
   }
 
-  async findAll(tenantId: string): Promise<WebhookSubscription[]> {
+  async findAll(tenantId: string): Promise<WebhookSubscriptionEntity[]> {
     return this.webhookRepo.find({ where: { tenantId } });
   }
 
-  async update(tenantId: string, id: string, dto: UpdateWebhookRequest): Promise<WebhookSubscription> {
+  async update(tenantId: string, id: string, dto: UpdateWebhookRequest): Promise<WebhookSubscriptionEntity> {
     const webhook = await this.webhookRepo.findOne({ where: { id, tenantId } });
     if (!webhook) throw new NotFoundException(`Webhook ${id} not found`);
     Object.assign(webhook, dto);
@@ -52,7 +52,7 @@ export class WebhookService {
     );
   }
 
-  private async send(webhook: WebhookSubscription, body: string, event: string): Promise<void> {
+  private async send(webhook: WebhookSubscriptionEntity, body: string, event: string): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Ferri-Event': event,

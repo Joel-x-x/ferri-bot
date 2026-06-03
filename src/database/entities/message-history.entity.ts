@@ -32,7 +32,7 @@ export enum MessageStatus {
 @Entity('message_history')
 @Index(['tenantId', 'contactPhone'])
 @Index(['tenantId', 'createdAt'])
-export class MessageHistory {
+export class MessageHistoryEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

@@ -50,14 +50,14 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
       client.data.userId = payload.sub;
       client.join(tenantId);
 
-      this.logger.log(`Client connected: ${client.id} tenant=${tenantId}`);
+      this.logger.log(`ws.client_connected clientId=${client.id} tenant=${tenantId}`);
     } catch {
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`ws.client_disconnected clientId=${client.id}`);
   }
 
   emitToTenant(tenantId: string, event: string, data: any) {

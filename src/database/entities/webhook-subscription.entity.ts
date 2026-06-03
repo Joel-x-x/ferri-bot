@@ -15,7 +15,7 @@ export const WEBHOOK_EVENTS = [
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number] | '*';
 
 @Entity('webhook_subscriptions')
-export class WebhookSubscription {
+export class WebhookSubscriptionEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

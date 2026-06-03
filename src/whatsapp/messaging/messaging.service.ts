@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
 import {
-  MessageHistory,
+  MessageHistoryEntityEntity,
   MessageDirection,
   MessageType,
   MessageStatus,
@@ -30,8 +30,8 @@ export class MessagingService {
   private readonly logger = new Logger(MessagingService.name);
 
   constructor(
-    @InjectRepository(MessageHistory)
-    private readonly messageRepo: Repository<MessageHistory>,
+    @InjectRepository(MessageHistoryEntity)
+    private readonly messageRepo: Repository<MessageHistoryEntity>,
     private readonly credentialsService: CredentialsService,
     private readonly gateway: WhatsappGateway,
   ) {}
@@ -210,7 +210,7 @@ export class MessagingService {
     contactPhone: string,
     page = 1,
     limit = 20,
-  ): Promise<{ data: MessageHistory[]; total: number; page: number; limit: number }> {
+  ): Promise<{ data: MessageHistoryEntity[]; total: number; page: number; limit: number }> {
     const [data, total] = await this.messageRepo.findAndCount({
       where: { tenantId, contactPhone },
       order: { createdAt: 'DESC' },

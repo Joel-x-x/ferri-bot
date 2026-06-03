@@ -5,23 +5,26 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AiProvider } from '../database/entities/ai-provider.entity';
+import { AiProviderEntityEntity } from '../database/entities/ai-provider.entity';
 import { encrypt, decrypt } from '../shared/utils/crypto.util';
 import { envs } from '../config/envs';
-import { AiProviderFactory } from './ai-provider.factory';
+import { AiProviderEntityFactory } from './ai-provider.factory';
 import { AiMessage } from './adapters/ai-adapter.interface';
-import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
+import { UpsertAiProviderEntityRequest, UpdateAiProviderEntityRequest } from './dto/ai-provider.dto';
 
 @Injectable()
-export class AiProviderService {
+export class AiProviderEntityService {
   constructor(
-    @InjectRepository(AiProvider)
-    private readonly providerRepo: Repository<AiProvider>,
+    @InjectRepository(AiProviderEntity)
+    private readonly providerRepo: Repository<AiProviderEntity>,
   ) {}
 
-  async upsert(tenantId: string, dto: UpsertAiProviderRequest): Promise<Omit<AiProvider, 'apiKey'>> {
+  async upsert(
+    tenantId: string,
+    dto: UpsertAiProviderEntityRequest,
+  ): Promise<{ data: Omit<AiProviderEntity, 'apiKey'>; created: boolean }> {
     let entity = await this.providerRepo.findOne({ where: { tenantId } });
-
+    const created = !entity;
     const encryptedKey = encrypt(dto.apiKey, envs.encryptionKey);
 
     if (entity) {
@@ -31,19 +34,19 @@ export class AiProviderService {
     }
 
     const saved = await this.providerRepo.save(entity);
-    return this.sanitize(saved);
+    return { data: this.sanitize(saved), created };
   }
 
-  async getProvider(tenantId: string): Promise<AiProvider | null> {
+  async getProvider(tenantId: string): Promise<AiProviderEntity | null> {
     return this.providerRepo.findOne({ where: { tenantId } });
   }
 
-  async getProviderSafe(tenantId: string): Promise<Omit<AiProvider, 'apiKey'> | null> {
+  async getProviderSafe(tenantId: string): Promise<Omit<AiProviderEntity, 'apiKey'> | null> {
     const entity = await this.providerRepo.findOne({ where: { tenantId } });
     return entity ? this.sanitize(entity) : null;
   }
 
-  async update(tenantId: string, dto: UpdateAiProviderRequest): Promise<Omit<AiProvider, 'apiKey'>> {
+  async update(tenantId: string, dto: UpdateAiProviderEntityRequest): Promise<Omit<AiProviderEntity, 'apiKey'>> {
     const entity = await this.providerRepo.findOne({ where: { tenantId } });
     if (!entity) throw new NotFoundException(`AI provider not found for tenant ${tenantId}`);
 
@@ -73,7 +76,7 @@ export class AiProviderService {
     if (!entity) throw new NotFoundException(`No active AI provider for tenant ${tenantId}`);
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
-    const adapter = AiProviderFactory.create(entity, decryptedKey);
+    const adapter = AiProviderEntityFactory.create(entity, decryptedKey);
     return adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
   }
 
@@ -90,11 +93,11 @@ export class AiProviderService {
     if (!entity?.autoReply) return null;
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
-    const adapter = AiProviderFactory.create(entity, decryptedKey);
+    const adapter = AiProviderEntityFactory.create(entity, decryptedKey);
     return adapter.chat(messages, entity.systemPrompt);
   }
 
-  private sanitize(entity: AiProvider): Omit<AiProvider, 'apiKey'> {
+  private sanitize(entity: AiProviderEntity): Omit<AiProviderEntity, 'apiKey'> {
     const { apiKey, ...safe } = entity;
     return safe;
   }

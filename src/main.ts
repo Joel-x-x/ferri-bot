@@ -1,5 +1,5 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { envs } from './config/envs';
@@ -7,6 +7,7 @@ import { ResponseInterceptor } from './shared/interceptors/response.interceptor'
 import { AllExceptionsFilter } from './shared/filters/all-exceptions.filter';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api/v1');
@@ -49,8 +50,8 @@ async function bootstrap() {
   });
 
   await app.listen(envs.port);
-  console.log(`ferri-bot running on port ${envs.port}`);
-  console.log(`Swagger docs → http://localhost:${envs.port}/docs`);
+  logger.log(`ferri-bot port=${envs.port}`);
+  logger.log(`swagger docs=http://localhost:${envs.port}/docs`);
 }
 
 bootstrap();

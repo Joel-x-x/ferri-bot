@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MetaCredentials } from '../../database/entities/meta-credentials.entity';
+import { MetaCredentialsEntityEntity } from '../../database/entities/meta-credentials.entity';
 import { encrypt, decrypt } from '../../shared/utils/crypto.util';
 import { envs } from '../../config/envs';
 import { CreateCredentialsRequest, UpdateCredentialsRequest, CredentialsResponse } from './dto/credentials.dto';
@@ -13,8 +13,8 @@ import { CreateCredentialsRequest, UpdateCredentialsRequest, CredentialsResponse
 @Injectable()
 export class CredentialsService {
   constructor(
-    @InjectRepository(MetaCredentials)
-    private readonly repo: Repository<MetaCredentials>,
+    @InjectRepository(MetaCredentialsEntity)
+    private readonly repo: Repository<MetaCredentialsEntity>,
   ) {}
 
   async create(tenantId: string, dto: CreateCredentialsRequest): Promise<CredentialsResponse> {
@@ -28,10 +28,10 @@ export class CredentialsService {
     return this.sanitize(saved);
   }
 
-  async findByTenant(tenantId: string): Promise<MetaCredentials> {
+  async findByTenant(tenantId: string): Promise<MetaCredentialsEntity> {
     const creds = await this.repo.findOne({ where: { tenantId } });
     if (!creds) throw new NotFoundException('No credentials found for this tenant');
-    return { ...creds, accessToken: decrypt(creds.accessToken, envs.encryptionKey) } as MetaCredentials;
+    return { ...creds, accessToken: decrypt(creds.accessToken, envs.encryptionKey) } as MetaCredentialsEntity;
   }
 
   async findByTenantSafe(tenantId: string): Promise<CredentialsResponse> {
@@ -40,14 +40,14 @@ export class CredentialsService {
     return this.sanitize(creds);
   }
 
-  async findByPhoneNumberId(phoneNumberId: string): Promise<MetaCredentials | null> {
+  async findByPhoneNumberId(phoneNumberId: string): Promise<MetaCredentialsEntity | null> {
     const creds = await this.repo.findOne({ where: { phoneNumberId, isActive: true } });
     if (!creds) return null;
     creds.accessToken = decrypt(creds.accessToken, envs.encryptionKey);
     return creds;
   }
 
-  async findByVerifyToken(verifyToken: string): Promise<MetaCredentials | null> {
+  async findByVerifyToken(verifyToken: string): Promise<MetaCredentialsEntity | null> {
     return this.repo.findOne({ where: { verifyToken, isActive: true } });
   }
 
@@ -69,7 +69,7 @@ export class CredentialsService {
     await this.repo.remove(creds);
   }
 
-  private sanitize(entity: MetaCredentials): CredentialsResponse {
+  private sanitize(entity: MetaCredentialsEntity): CredentialsResponse {
     const { accessToken: _, ...safe } = entity;
     return safe as CredentialsResponse;
   }

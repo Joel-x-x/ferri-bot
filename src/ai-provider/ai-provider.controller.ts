@@ -5,11 +5,13 @@ import {
   Patch,
   Delete,
   Body,
+  Res,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AiProviderService } from './ai-provider.service';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { CurrentTenant } from '../shared/decorators/current-tenant.decorator';
@@ -23,9 +25,14 @@ export class AiProviderController {
   constructor(private readonly aiProviderService: AiProviderService) {}
 
   @Post('provider')
-  @HttpCode(HttpStatus.CREATED)
-  upsert(@CurrentTenant() tenantId: string, @Body() dto: UpsertAiProviderRequest) {
-    return this.aiProviderService.upsert(tenantId, dto);
+  async upsert(
+    @CurrentTenant() tenantId: string,
+    @Body() dto: UpsertAiProviderRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { data, created } = await this.aiProviderService.upsert(tenantId, dto);
+    res.status(created ? HttpStatus.CREATED : HttpStatus.OK);
+    return data;
   }
 
   @Get('provider')

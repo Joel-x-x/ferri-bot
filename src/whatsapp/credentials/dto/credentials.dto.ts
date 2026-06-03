@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
-import { MetaCredentials } from '../../../database/entities/meta-credentials.entity';
+import { MetaCredentialsEntity } from '../../../database/entities/meta-credentials.entity';
 
 export class CreateCredentialsRequest {
   @IsString() @IsNotEmpty() phoneNumberId: string;
@@ -16,4 +16,4 @@ export class UpdateCredentialsRequest {
   @IsBoolean() @IsOptional() isActive?: boolean;
 }
 
-export type CredentialsResponse = Omit<MetaCredentials, 'accessToken'>;
+export type CredentialsResponse = Omit<MetaCredentialsEntity, 'accessToken'>;

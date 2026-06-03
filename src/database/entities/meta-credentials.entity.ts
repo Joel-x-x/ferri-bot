@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity('meta_credentials')
-export class MetaCredentials {
+export class MetaCredentialsEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

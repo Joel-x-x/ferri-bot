@@ -1,20 +1,20 @@
-import { AiProvider, AiProviderType } from '../database/entities/ai-provider.entity';
+import { AiProviderEntityEntity, AiProviderEntityType } from '../database/entities/ai-provider.entity';
 import { AiAdapter } from './adapters/ai-adapter.interface';
 import { GeminiAdapter } from './adapters/gemini.adapter';
 import { OpenAiAdapter } from './adapters/openai.adapter';
 import { AnthropicAdapter } from './adapters/anthropic.adapter';
 import { CustomAdapter } from './adapters/custom.adapter';
 
-export class AiProviderFactory {
-  static create(config: AiProvider, decryptedApiKey: string): AiAdapter {
+export class AiProviderEntityFactory {
+  static create(config: AiProviderEntity, decryptedApiKey: string): AiAdapter {
     switch (config.provider) {
-      case AiProviderType.GEMINI:
+      case AiProviderEntityType.GEMINI:
         return new GeminiAdapter(decryptedApiKey, config.model);
-      case AiProviderType.OPENAI:
+      case AiProviderEntityType.OPENAI:
         return new OpenAiAdapter(decryptedApiKey, config.model);
-      case AiProviderType.ANTHROPIC:
+      case AiProviderEntityType.ANTHROPIC:
         return new AnthropicAdapter(decryptedApiKey, config.model);
-      case AiProviderType.CUSTOM:
+      case AiProviderEntityType.CUSTOM:
         return new CustomAdapter(decryptedApiKey, config.baseUrl, config.model);
       default:
         throw new Error(`Unsupported AI provider: ${config.provider}`);

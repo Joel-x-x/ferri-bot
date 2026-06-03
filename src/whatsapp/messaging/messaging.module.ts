@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MessageHistory } from '../../database/entities/message-history.entity';
+import { MessageHistoryEntity } from '../../database/entities/message-history.entity';
 import { MessagingService } from './messaging.service';
 import { MessagingController } from './messaging.controller';
 import { CredentialsModule } from '../credentials/credentials.module';
@@ -8,7 +8,7 @@ import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MessageHistory]),
+    TypeOrmModule.forFeature([MessageHistoryEntity]),
     CredentialsModule,
     GatewayModule,
   ],
