@@ -11,6 +11,7 @@ export class IncomingService {
   private readonly logger = new Logger(IncomingService.name);
   private conversationHistory = new Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>();
   private readonly MAX_HISTORY = 20;
+  private readonly MAX_CONVERSATIONS = 500;
 
   constructor(
     private readonly messagingService: MessagingService,
@@ -121,6 +122,12 @@ export class IncomingService {
 
       const historyKey = `${tenantId}:${from}`;
       const history = this.conversationHistory.get(historyKey) ?? [];
+
+      // Evict oldest conversation if map is at capacity
+      if (!this.conversationHistory.has(historyKey) && this.conversationHistory.size >= this.MAX_CONVERSATIONS) {
+        const oldestKey = this.conversationHistory.keys().next().value;
+        this.conversationHistory.delete(oldestKey);
+      }
 
       history.push({ role: 'user', content });
       if (history.length > this.MAX_HISTORY) history.shift();

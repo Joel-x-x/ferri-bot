@@ -30,9 +30,10 @@ async function bootstrap() {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
       'JWT',
     )
-    .addTag('sessions', 'WhatsApp session management')
+    .addTag('credentials', 'Meta Cloud API credentials per tenant')
+    .addTag('meta-webhook', 'Meta webhook verification & incoming events')
     .addTag('messages', 'Send messages (text, image, audio, video, doc, bulk)')
-    .addTag('webhooks', 'Webhook subscriptions')
+    .addTag('webhooks', 'Webhook subscriptions to tenant systems')
     .addTag('ai', 'AI provider configuration & auto-reply')
     .build();
 

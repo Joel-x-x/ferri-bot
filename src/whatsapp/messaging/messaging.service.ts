@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import {
   MessageHistory,
   MessageDirection,
@@ -38,13 +38,29 @@ export class MessagingService {
 
   private async graphPost(phoneNumberId: string, accessToken: string, body: object): Promise<string> {
     const url = `${GRAPH_URL}/${phoneNumberId}/messages`;
-    const { data } = await axios.post(url, body, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    return data?.messages?.[0]?.id ?? '';
+    try {
+      const { data } = await axios.post(url, body, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10_000,
+      });
+      return data?.messages?.[0]?.id ?? '';
+    } catch (err) {
+      const axiosErr = err as AxiosError<any>;
+      const metaError = axiosErr.response?.data?.error;
+      const status = axiosErr.response?.status;
+
+      if (status === 401) {
+        throw new UnauthorizedException('Meta access token invalid or expired');
+      }
+      if (status === 400) {
+        throw new BadRequestException(metaError?.message ?? 'Invalid message payload');
+      }
+      this.logger.error(`meta.graph_post_failed status=${status} error=${metaError?.message ?? err.message}`);
+      throw err;
+    }
   }
 
   private async saveOutbound(

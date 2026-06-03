@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -17,6 +18,8 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -32,7 +35,7 @@ export class JwtAuthGuard implements CanActivate {
       request['user'] = payload;
       return true;
     } catch (err) {
-      console.error('[JwtGuard] verify failed:', err.message, '| secret used:', envs.jwt.secret);
+      this.logger.warn(`jwt.verify_failed reason=${err.message}`);
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
