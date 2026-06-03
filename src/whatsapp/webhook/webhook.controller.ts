@@ -14,7 +14,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WebhookService } from './webhook.service';
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../shared/decorators/current-tenant.decorator';
-import { CreateWebhookDto, UpdateWebhookDto } from './dto/webhook.dto';
+import { CreateWebhookRequest, UpdateWebhookRequest } from './dto/webhook.dto';
 
 @ApiTags('webhooks')
 @ApiBearerAuth('JWT')
@@ -24,7 +24,7 @@ export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
   @Post()
-  create(@CurrentTenant() tenantId: string, @Body() dto: CreateWebhookDto) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateWebhookRequest) {
     return this.webhookService.create(tenantId, dto);
   }
 
@@ -37,7 +37,7 @@ export class WebhookController {
   update(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
-    @Body() dto: UpdateWebhookDto,
+    @Body() dto: UpdateWebhookRequest,
   ) {
     return this.webhookService.update(tenantId, id, dto);
   }

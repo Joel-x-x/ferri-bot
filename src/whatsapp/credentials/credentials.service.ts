@@ -8,7 +8,7 @@ import { Repository } from 'typeorm';
 import { MetaCredentials } from '../../database/entities/meta-credentials.entity';
 import { encrypt, decrypt } from '../../shared/utils/crypto.util';
 import { envs } from '../../config/envs';
-import { CreateCredentialsDto, UpdateCredentialsDto, CredentialsResponse } from './dto/credentials.dto';
+import { CreateCredentialsRequest, UpdateCredentialsRequest, CredentialsResponse } from './dto/credentials.dto';
 
 @Injectable()
 export class CredentialsService {
@@ -17,7 +17,7 @@ export class CredentialsService {
     private readonly repo: Repository<MetaCredentials>,
   ) {}
 
-  async create(tenantId: string, dto: CreateCredentialsDto): Promise<CredentialsResponse> {
+  async create(tenantId: string, dto: CreateCredentialsRequest): Promise<CredentialsResponse> {
     const existing = await this.repo.findOne({ where: { tenantId } });
     if (existing) throw new ConflictException('Credentials already exist for this tenant');
     const saved = await this.repo.save({
@@ -31,8 +31,7 @@ export class CredentialsService {
   async findByTenant(tenantId: string): Promise<MetaCredentials> {
     const creds = await this.repo.findOne({ where: { tenantId } });
     if (!creds) throw new NotFoundException('No credentials found for this tenant');
-    creds.accessToken = decrypt(creds.accessToken, envs.encryptionKey);
-    return creds;
+    return { ...creds, accessToken: decrypt(creds.accessToken, envs.encryptionKey) } as MetaCredentials;
   }
 
   async findByTenantSafe(tenantId: string): Promise<CredentialsResponse> {
@@ -52,7 +51,7 @@ export class CredentialsService {
     return this.repo.findOne({ where: { verifyToken, isActive: true } });
   }
 
-  async update(tenantId: string, dto: UpdateCredentialsDto): Promise<CredentialsResponse> {
+  async update(tenantId: string, dto: UpdateCredentialsRequest): Promise<CredentialsResponse> {
     const creds = await this.repo.findOne({ where: { tenantId } });
     if (!creds) throw new NotFoundException('No credentials found for this tenant');
     if (dto.accessToken) {

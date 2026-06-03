@@ -23,39 +23,44 @@ export class IncomingService {
 
   async verifyToken(verifyToken: string): Promise<boolean> {
     const creds = await this.credentialsService.findByVerifyToken(verifyToken).catch(() => null);
+    if (creds) this.logger.log('meta.webhook_verified');
     return !!creds;
   }
 
   async handlePayload(payload: any): Promise<void> {
     if (payload?.object !== 'whatsapp_business_account') return;
 
-    for (const entry of payload?.entry ?? []) {
-      for (const change of entry?.changes ?? []) {
-        if (change?.field !== 'messages') continue;
-        const value = change?.value;
-        const phoneNumberId: string = value?.metadata?.phone_number_id;
-        if (!phoneNumberId) continue;
+    try {
+      for (const entry of payload?.entry ?? []) {
+        for (const change of entry?.changes ?? []) {
+          if (change?.field !== 'messages') continue;
+          const value = change?.value;
+          const phoneNumberId: string = value?.metadata?.phone_number_id;
+          if (!phoneNumberId) continue;
 
-        const creds = await this.credentialsService.findByPhoneNumberId(phoneNumberId);
-        if (!creds) {
-          this.logger.warn(`No tenant for phone_number_id ${phoneNumberId}`);
-          continue;
-        }
+          const creds = await this.credentialsService.findByPhoneNumberId(phoneNumberId);
+          if (!creds) {
+            this.logger.warn(`meta.unknown_phone_number_id phoneNumberId=${phoneNumberId}`);
+            continue;
+          }
 
-        const { tenantId } = creds;
+          const { tenantId } = creds;
 
-        for (const msg of value?.messages ?? []) {
-          await this.handleMessage(tenantId, msg).catch((err) =>
-            this.logger.error(`Message handling failed for ${tenantId}: ${err.message}`),
-          );
-        }
+          for (const msg of value?.messages ?? []) {
+            await this.handleMessage(tenantId, msg).catch((err) =>
+              this.logger.error(`meta.message_handling_failed tenant=${tenantId} error=${err.message}`),
+            );
+          }
 
-        for (const status of value?.statuses ?? []) {
-          await this.handleStatus(tenantId, status).catch((err) =>
-            this.logger.error(`Status handling failed for ${tenantId}: ${err.message}`),
-          );
+          for (const status of value?.statuses ?? []) {
+            await this.handleStatus(tenantId, status).catch((err) =>
+              this.logger.error(`meta.status_handling_failed tenant=${tenantId} error=${err.message}`),
+            );
+          }
         }
       }
+    } catch (err) {
+      this.logger.error(`meta.webhook_process_failed error=${err.message}`);
     }
   }
 

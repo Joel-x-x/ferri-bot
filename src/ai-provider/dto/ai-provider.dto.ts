@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { AiProviderType } from '../../database/entities/ai-provider.entity';
 
-export class UpsertAiProviderDto {
+export class UpsertAiProviderRequest {
   @IsEnum(AiProviderType)
   provider: AiProviderType;
 
@@ -37,7 +37,7 @@ export class UpsertAiProviderDto {
   autoReply?: boolean;
 }
 
-export class UpdateAiProviderDto {
+export class UpdateAiProviderRequest {
   @IsString()
   @IsOptional()
   apiKey?: string;
@@ -63,7 +63,7 @@ export class UpdateAiProviderDto {
   autoReply?: boolean;
 }
 
-export class TestAiDto {
+export class TestAiRequest {
   @IsString()
   @IsNotEmpty()
   message: string;

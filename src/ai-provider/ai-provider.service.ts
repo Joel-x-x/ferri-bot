@@ -10,7 +10,7 @@ import { encrypt, decrypt } from '../shared/utils/crypto.util';
 import { envs } from '../config/envs';
 import { AiProviderFactory } from './ai-provider.factory';
 import { AiMessage } from './adapters/ai-adapter.interface';
-import { UpsertAiProviderDto, UpdateAiProviderDto } from './dto/ai-provider.dto';
+import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
 
 @Injectable()
 export class AiProviderService {
@@ -19,7 +19,7 @@ export class AiProviderService {
     private readonly providerRepo: Repository<AiProvider>,
   ) {}
 
-  async upsert(tenantId: string, dto: UpsertAiProviderDto): Promise<Omit<AiProvider, 'apiKey'>> {
+  async upsert(tenantId: string, dto: UpsertAiProviderRequest): Promise<Omit<AiProvider, 'apiKey'>> {
     let entity = await this.providerRepo.findOne({ where: { tenantId } });
 
     const encryptedKey = encrypt(dto.apiKey, envs.encryptionKey);
@@ -43,7 +43,7 @@ export class AiProviderService {
     return entity ? this.sanitize(entity) : null;
   }
 
-  async update(tenantId: string, dto: UpdateAiProviderDto): Promise<Omit<AiProvider, 'apiKey'>> {
+  async update(tenantId: string, dto: UpdateAiProviderRequest): Promise<Omit<AiProvider, 'apiKey'>> {
     const entity = await this.providerRepo.findOne({ where: { tenantId } });
     if (!entity) throw new NotFoundException(`AI provider not found for tenant ${tenantId}`);
 

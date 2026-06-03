@@ -7,7 +7,6 @@ import {
   Res,
   HttpCode,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -16,14 +15,11 @@ import { IncomingService } from './incoming.service';
 @ApiTags('meta-webhook')
 @Controller('whatsapp/meta/webhook')
 export class MetaWebhookController {
-  private readonly logger = new Logger(MetaWebhookController.name);
-
   constructor(private readonly incomingService: IncomingService) {}
 
   /**
    * GET — Meta webhook verification challenge.
    * Meta sends hub.mode, hub.verify_token, hub.challenge.
-   * We look up the tenant by verify_token and respond with the challenge.
    */
   @Get()
   async verify(
@@ -34,25 +30,19 @@ export class MetaWebhookController {
   ) {
     if (mode === 'subscribe') {
       const valid = await this.incomingService.verifyToken(verifyToken);
-      if (valid) {
-        this.logger.log('meta.webhook_verified');
-        return res.status(200).send(challenge);
-      }
+      if (valid) return res.status(200).send(challenge);
     }
     return res.status(403).send('Forbidden');
   }
 
   /**
    * POST — Receive messages and status updates from Meta.
-   * Payload is routed by phone_number_id → tenant.
+   * Always responds 200 immediately; processing is fire-and-forget.
    */
   @Post()
   @HttpCode(HttpStatus.OK)
-  async receive(@Body() payload: any) {
-    // Always respond 200 immediately to Meta
-    this.incomingService.handlePayload(payload).catch((err) =>
-      this.logger.error(`Error processing Meta webhook: ${err.message}`),
-    );
+  receive(@Body() payload: any) {
+    void this.incomingService.handlePayload(payload);
     return { status: 'ok' };
   }
 }

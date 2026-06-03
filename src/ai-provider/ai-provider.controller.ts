@@ -13,7 +13,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AiProviderService } from './ai-provider.service';
 import { JwtAuthGuard } from '../shared/guards/jwt-auth.guard';
 import { CurrentTenant } from '../shared/decorators/current-tenant.decorator';
-import { UpsertAiProviderDto, UpdateAiProviderDto, TestAiDto } from './dto/ai-provider.dto';
+import { UpsertAiProviderRequest, UpdateAiProviderRequest, TestAiRequest } from './dto/ai-provider.dto';
 
 @ApiTags('ai')
 @ApiBearerAuth('JWT')
@@ -24,7 +24,7 @@ export class AiProviderController {
 
   @Post('provider')
   @HttpCode(HttpStatus.CREATED)
-  upsert(@CurrentTenant() tenantId: string, @Body() dto: UpsertAiProviderDto) {
+  upsert(@CurrentTenant() tenantId: string, @Body() dto: UpsertAiProviderRequest) {
     return this.aiProviderService.upsert(tenantId, dto);
   }
 
@@ -34,7 +34,7 @@ export class AiProviderController {
   }
 
   @Patch('provider')
-  update(@CurrentTenant() tenantId: string, @Body() dto: UpdateAiProviderDto) {
+  update(@CurrentTenant() tenantId: string, @Body() dto: UpdateAiProviderRequest) {
     return this.aiProviderService.update(tenantId, dto);
   }
 
@@ -46,7 +46,7 @@ export class AiProviderController {
 
   @Post('test')
   @HttpCode(HttpStatus.OK)
-  async test(@CurrentTenant() tenantId: string, @Body() dto: TestAiDto) {
+  async test(@CurrentTenant() tenantId: string, @Body() dto: TestAiRequest) {
     const response = await this.aiProviderService.chat(
       tenantId,
       [{ role: 'user', content: dto.message }],

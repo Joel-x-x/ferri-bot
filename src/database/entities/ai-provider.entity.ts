@@ -21,7 +21,7 @@ export class AiProvider {
   @Column({ name: 'tenant_id', unique: true, length: 100 })
   tenantId: string;
 
-  @Column({ type: 'enum', enum: AiProviderType })
+  @Column({ type: 'varchar', length: 20 })
   provider: AiProviderType;
 
   @Column({ name: 'api_key', type: 'text', nullable: true })

@@ -13,7 +13,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CredentialsService } from './credentials.service';
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../shared/decorators/current-tenant.decorator';
-import { CreateCredentialsDto, UpdateCredentialsDto } from './dto/credentials.dto';
+import { CreateCredentialsRequest, UpdateCredentialsRequest } from './dto/credentials.dto';
 
 @ApiTags('credentials')
 @ApiBearerAuth('JWT')
@@ -24,7 +24,7 @@ export class CredentialsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@CurrentTenant() tenantId: string, @Body() dto: CreateCredentialsDto) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateCredentialsRequest) {
     return this.credentialsService.create(tenantId, dto);
   }
 
@@ -34,7 +34,7 @@ export class CredentialsController {
   }
 
   @Patch()
-  update(@CurrentTenant() tenantId: string, @Body() dto: UpdateCredentialsDto) {
+  update(@CurrentTenant() tenantId: string, @Body() dto: UpdateCredentialsRequest) {
     return this.credentialsService.update(tenantId, dto);
   }
 

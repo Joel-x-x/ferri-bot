@@ -10,16 +10,16 @@ import {
 } from '../../database/entities/message-history.entity';
 import { CredentialsService } from '../credentials/credentials.service';
 import { WhatsappGateway } from '../gateway/whatsapp.gateway';
-import { SendTextDto } from './dto/send-text.dto';
+import { SendTextRequest } from './dto/send-text.dto';
 import {
-  SendImageDto,
-  SendAudioDto,
-  SendVideoDto,
-  SendDocumentDto,
-  SendReplyDto,
-  SendReactionDto,
+  SendImageRequest,
+  SendAudioRequest,
+  SendVideoRequest,
+  SendDocumentRequest,
+  SendReplyRequest,
+  SendReactionRequest,
 } from './dto/send-media.dto';
-import { SendBulkDto } from './dto/send-bulk.dto';
+import { SendBulkRequest } from './dto/send-bulk.dto';
 import { envs } from '../../config/envs';
 
 const RATE_LIMIT_MS = 1000;
@@ -88,7 +88,7 @@ export class MessagingService {
     });
   }
 
-  async sendText(tenantId: string, dto: SendTextDto): Promise<{ messageId: string }> {
+  async sendText(tenantId: string, dto: SendTextRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -101,7 +101,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendImage(tenantId: string, dto: SendImageDto): Promise<{ messageId: string }> {
+  async sendImage(tenantId: string, dto: SendImageRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -114,7 +114,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendAudio(tenantId: string, dto: SendAudioDto): Promise<{ messageId: string }> {
+  async sendAudio(tenantId: string, dto: SendAudioRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -127,7 +127,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendVideo(tenantId: string, dto: SendVideoDto): Promise<{ messageId: string }> {
+  async sendVideo(tenantId: string, dto: SendVideoRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -140,7 +140,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendDocument(tenantId: string, dto: SendDocumentDto): Promise<{ messageId: string }> {
+  async sendDocument(tenantId: string, dto: SendDocumentRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -153,7 +153,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendReply(tenantId: string, dto: SendReplyDto): Promise<{ messageId: string }> {
+  async sendReply(tenantId: string, dto: SendReplyRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -167,7 +167,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendReaction(tenantId: string, dto: SendReactionDto): Promise<{ messageId: string }> {
+  async sendReaction(tenantId: string, dto: SendReactionRequest): Promise<{ messageId: string }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     const messageId = await this.graphPost(phoneNumberId, accessToken, {
       messaging_product: 'whatsapp',
@@ -179,7 +179,7 @@ export class MessagingService {
     return { messageId };
   }
 
-  async sendBulk(tenantId: string, dto: SendBulkDto): Promise<{ sent: number; failed: number }> {
+  async sendBulk(tenantId: string, dto: SendBulkRequest): Promise<{ sent: number; failed: number }> {
     const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     let sent = 0;
     let failed = 0;

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
 import axios from 'axios';
 import { WebhookSubscription } from '../../database/entities/webhook-subscription.entity';
-import { CreateWebhookDto, UpdateWebhookDto } from './dto/webhook.dto';
+import { CreateWebhookRequest, UpdateWebhookRequest } from './dto/webhook.dto';
 
 @Injectable()
 export class WebhookService {
@@ -15,7 +15,7 @@ export class WebhookService {
     private readonly webhookRepo: Repository<WebhookSubscription>,
   ) {}
 
-  async create(tenantId: string, dto: CreateWebhookDto): Promise<WebhookSubscription> {
+  async create(tenantId: string, dto: CreateWebhookRequest): Promise<WebhookSubscription> {
     return this.webhookRepo.save({ ...dto, tenantId });
   }
 
@@ -23,7 +23,7 @@ export class WebhookService {
     return this.webhookRepo.find({ where: { tenantId } });
   }
 
-  async update(tenantId: string, id: string, dto: UpdateWebhookDto): Promise<WebhookSubscription> {
+  async update(tenantId: string, id: string, dto: UpdateWebhookRequest): Promise<WebhookSubscription> {
     const webhook = await this.webhookRepo.findOne({ where: { id, tenantId } });
     if (!webhook) throw new NotFoundException(`Webhook ${id} not found`);
     Object.assign(webhook, dto);
@@ -48,14 +48,14 @@ export class WebhookService {
     const body = JSON.stringify({ event, data: payload, timestamp: new Date().toISOString() });
 
     await Promise.allSettled(
-      matching.map((webhook) => this.send(webhook, body)),
+      matching.map((webhook) => this.send(webhook, body, event)),
     );
   }
 
-  private async send(webhook: WebhookSubscription, body: string): Promise<void> {
+  private async send(webhook: WebhookSubscription, body: string, event: string): Promise<void> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Ferri-Event': 'whatsapp',
+      'X-Ferri-Event': event,
     };
 
     if (webhook.secret) {
@@ -66,7 +66,7 @@ export class WebhookService {
     try {
       await axios.post(webhook.url, body, { headers, timeout: 10_000 });
     } catch (err) {
-      this.logger.warn(`Webhook delivery failed to ${webhook.url}: ${err.message}`);
+      this.logger.warn(`webhook.delivery_failed url=${webhook.url} error=${err.message}`);
     }
   }
 }

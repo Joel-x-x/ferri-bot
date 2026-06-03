@@ -12,7 +12,7 @@ class BulkItem {
   @IsString() @IsNotEmpty() text: string;
 }
 
-export class SendBulkDto {
+export class SendBulkRequest {
   @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })

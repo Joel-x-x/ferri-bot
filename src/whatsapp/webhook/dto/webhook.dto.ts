@@ -1,7 +1,7 @@
 import { IsUrl, IsArray, IsString, IsOptional, IsBoolean, ArrayNotEmpty } from 'class-validator';
 import { WEBHOOK_EVENTS, WebhookEvent } from '../../../database/entities/webhook-subscription.entity';
 
-export class CreateWebhookDto {
+export class CreateWebhookRequest {
   @IsUrl()
   url: string;
 
@@ -15,7 +15,7 @@ export class CreateWebhookDto {
   secret?: string;
 }
 
-export class UpdateWebhookDto {
+export class UpdateWebhookRequest {
   @IsUrl()
   @IsOptional()
   url?: string;

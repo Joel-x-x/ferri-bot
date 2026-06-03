@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, Matches } from 'class-validator';
 
-export class SendTextDto {
+export class SendTextRequest {
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d{7,15}$/, {
