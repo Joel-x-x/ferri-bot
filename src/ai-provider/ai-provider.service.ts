@@ -1,19 +1,18 @@
 import {
   Injectable,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AiProviderEntityEntity } from '../database/entities/ai-provider.entity';
+import { AiProviderEntity } from '../database/entities/ai-provider.entity';
 import { encrypt, decrypt } from '../shared/utils/crypto.util';
 import { envs } from '../config/envs';
-import { AiProviderEntityFactory } from './ai-provider.factory';
+import { AiProviderFactory } from './ai-provider.factory';
 import { AiMessage } from './adapters/ai-adapter.interface';
-import { UpsertAiProviderEntityRequest, UpdateAiProviderEntityRequest } from './dto/ai-provider.dto';
+import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
 
 @Injectable()
-export class AiProviderEntityService {
+export class AiProviderService {
   constructor(
     @InjectRepository(AiProviderEntity)
     private readonly providerRepo: Repository<AiProviderEntity>,
@@ -21,7 +20,7 @@ export class AiProviderEntityService {
 
   async upsert(
     tenantId: string,
-    dto: UpsertAiProviderEntityRequest,
+    dto: UpsertAiProviderRequest,
   ): Promise<{ data: Omit<AiProviderEntity, 'apiKey'>; created: boolean }> {
     let entity = await this.providerRepo.findOne({ where: { tenantId } });
     const created = !entity;
@@ -46,7 +45,7 @@ export class AiProviderEntityService {
     return entity ? this.sanitize(entity) : null;
   }
 
-  async update(tenantId: string, dto: UpdateAiProviderEntityRequest): Promise<Omit<AiProviderEntity, 'apiKey'>> {
+  async update(tenantId: string, dto: UpdateAiProviderRequest): Promise<Omit<AiProviderEntity, 'apiKey'>> {
     const entity = await this.providerRepo.findOne({ where: { tenantId } });
     if (!entity) throw new NotFoundException(`AI provider not found for tenant ${tenantId}`);
 
@@ -76,7 +75,7 @@ export class AiProviderEntityService {
     if (!entity) throw new NotFoundException(`No active AI provider for tenant ${tenantId}`);
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
-    const adapter = AiProviderEntityFactory.create(entity, decryptedKey);
+    const adapter = AiProviderFactory.create(entity, decryptedKey);
     return adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
   }
 
@@ -93,7 +92,7 @@ export class AiProviderEntityService {
     if (!entity?.autoReply) return null;
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
-    const adapter = AiProviderEntityFactory.create(entity, decryptedKey);
+    const adapter = AiProviderFactory.create(entity, decryptedKey);
     return adapter.chat(messages, entity.systemPrompt);
   }
 

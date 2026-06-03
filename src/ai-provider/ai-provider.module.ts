@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiProviderEntity } from '../database/entities/ai-provider.entity';
-import { AiProviderEntityService } from './ai-provider.service';
-import { AiProviderEntityController } from './ai-provider.controller';
+import { AiProviderService } from './ai-provider.service';
+import { AiProviderController } from './ai-provider.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([AiProviderEntity])],
-  providers: [AiProviderEntityService],
-  controllers: [AiProviderEntityController],
-  exports: [AiProviderEntityService],
+  providers: [AiProviderService],
+  controllers: [AiProviderController],
+  exports: [AiProviderService],
 })
-export class AiProviderEntityModule {}
+export class AiProviderModule {}
