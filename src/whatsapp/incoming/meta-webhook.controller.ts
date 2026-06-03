@@ -9,7 +9,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { IncomingService } from './incoming.service';
 
@@ -26,7 +26,6 @@ export class MetaWebhookController {
    * We look up the tenant by verify_token and respond with the challenge.
    */
   @Get()
-  @ApiOperation({ summary: 'Meta webhook verification' })
   async verify(
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') verifyToken: string,
@@ -49,7 +48,6 @@ export class MetaWebhookController {
    */
   @Post()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Receive Meta webhook events' })
   async receive(@Body() payload: any) {
     // Always respond 200 immediately to Meta
     this.incomingService.handlePayload(payload).catch((err) =>

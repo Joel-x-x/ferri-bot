@@ -19,6 +19,7 @@ export class WebhookSubscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ name: 'tenant_id', length: 100 })
   tenantId: string;
 

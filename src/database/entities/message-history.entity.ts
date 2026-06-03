@@ -42,13 +42,14 @@ export class MessageHistory {
   @Column({ name: 'contact_phone', length: 20 })
   contactPhone: string;
 
+  @Index()
   @Column({ name: 'message_id', length: 100, nullable: true })
   messageId: string;
 
-  @Column({ type: 'enum', enum: MessageDirection })
+  @Column({ type: 'varchar', length: 20 })
   direction: MessageDirection;
 
-  @Column({ type: 'enum', enum: MessageType })
+  @Column({ type: 'varchar', length: 20 })
   type: MessageType;
 
   @Column({ type: 'text', nullable: true })
@@ -60,7 +61,7 @@ export class MessageHistory {
   @Column({ name: 'quoted_message_id', length: 100, nullable: true })
   quotedMessageId: string;
 
-  @Column({ type: 'enum', enum: MessageStatus, default: MessageStatus.PENDING })
+  @Column({ type: 'varchar', length: 20, default: MessageStatus.PENDING })
   status: MessageStatus;
 
   @Column({ name: 'ai_processed', default: false })

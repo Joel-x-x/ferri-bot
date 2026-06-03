@@ -25,6 +25,7 @@ export class MetaCredentials {
   @Column({ name: 'waba_id', length: 50 })
   wabaId: string;
 
+  @Index()
   @Column({ name: 'verify_token', length: 100 })
   verifyToken: string;
 

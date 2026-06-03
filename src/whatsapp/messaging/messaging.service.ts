@@ -58,6 +58,9 @@ export class MessagingService {
       if (status === 400) {
         throw new BadRequestException(metaError?.message ?? 'Invalid message payload');
       }
+      if (status === 429) {
+        throw new BadRequestException('Meta API rate limit exceeded — try again later');
+      }
       this.logger.error(`meta.graph_post_failed status=${status} error=${metaError?.message ?? err.message}`);
       throw err;
     }
@@ -215,6 +218,23 @@ export class MessagingService {
       take: limit,
     });
     return { data, total, page, limit };
+  }
+
+  async saveAiOutbound(
+    tenantId: string,
+    to: string,
+    content: string,
+  ): Promise<void> {
+    await this.messageRepo.save({
+      tenantId,
+      contactPhone: to,
+      messageId: undefined,
+      direction: MessageDirection.OUTBOUND,
+      type: MessageType.TEXT,
+      content,
+      status: MessageStatus.SENT,
+      aiProcessed: true,
+    });
   }
 
   async saveInbound(

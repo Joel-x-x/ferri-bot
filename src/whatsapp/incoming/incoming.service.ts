@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { MessagingService } from '../messaging/messaging.service';
 import { WebhookService } from '../webhook/webhook.service';
 import { WhatsappGateway } from '../gateway/whatsapp.gateway';
@@ -118,9 +117,6 @@ export class IncomingService {
     if (!content) return;
 
     try {
-      const config = await this.aiProviderService.getProvider(tenantId);
-      if (!config?.isActive || !config?.autoReply) return;
-
       const historyKey = `${tenantId}:${from}`;
       const history = this.conversationHistory.get(historyKey) ?? [];
 
@@ -134,16 +130,18 @@ export class IncomingService {
       if (history.length > this.MAX_HISTORY) history.shift();
       this.conversationHistory.set(historyKey, history);
 
-      const aiResponse = await this.aiProviderService.chat(tenantId, history, config.systemPrompt);
+      // Single DB query: checks isActive + autoReply, returns null if disabled
+      const aiResponse = await this.aiProviderService.chatIfAutoReply(tenantId, history);
+      if (!aiResponse) return;
 
       history.push({ role: 'assistant', content: aiResponse });
       if (history.length > this.MAX_HISTORY) history.shift();
       this.conversationHistory.set(historyKey, history);
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResponse });
-      await this.messagingService.saveInbound(tenantId, from, randomUUID(), MessageType.TEXT, aiResponse, undefined, true);
+      await this.messagingService.saveAiOutbound(tenantId, from, aiResponse);
     } catch (err) {
-      this.logger.warn(`AI reply failed for ${tenantId}:${from}: ${err.message}`);
+      this.logger.warn(`ai.reply_failed tenant=${tenantId} from=${from} error=${err.message}`);
     }
   }
 }

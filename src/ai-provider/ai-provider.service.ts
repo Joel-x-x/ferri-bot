@@ -77,6 +77,23 @@ export class AiProviderService {
     return adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
   }
 
+  /**
+   * Single-query path for auto-reply flow.
+   * Returns null if provider not found, inactive, or autoReply disabled.
+   * Avoids the double findOne that getProvider() + chat() would require.
+   */
+  async chatIfAutoReply(
+    tenantId: string,
+    messages: AiMessage[],
+  ): Promise<string | null> {
+    const entity = await this.providerRepo.findOne({ where: { tenantId, isActive: true } });
+    if (!entity?.autoReply) return null;
+
+    const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
+    const adapter = AiProviderFactory.create(entity, decryptedKey);
+    return adapter.chat(messages, entity.systemPrompt);
+  }
+
   private sanitize(entity: AiProvider): Omit<AiProvider, 'apiKey'> {
     const { apiKey, ...safe } = entity;
     return safe;
