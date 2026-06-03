@@ -1,0 +1,58 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ override: true });
+import * as Joi from 'joi';
+
+const schema = Joi.object({
+  PORT: Joi.number().default(3000),
+  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+
+  PG_HOST: Joi.string().required(),
+  PG_PORT: Joi.number().default(5434),
+  PG_USER: Joi.string().required(),
+  PG_PASSWORD: Joi.string().required(),
+  PG_DATABASE: Joi.string().required(),
+
+  JWT_SECRET: Joi.string().required(),
+  JWT_ISSUER: Joi.string().default('ferridescuentos'),
+
+  ENCRYPTION_KEY: Joi.string().min(32).required(),
+
+  FRONTEND_URL: Joi.string().default('http://localhost:4200'),
+
+  GEMINI_API_KEY: Joi.string().allow('').optional(),
+  OPENAI_API_KEY: Joi.string().allow('').optional(),
+  ANTHROPIC_API_KEY: Joi.string().allow('').optional(),
+});
+
+const { error, value } = schema.validate(process.env, { allowUnknown: true });
+
+if (error) {
+  throw new Error(`Config validation error: ${error.message}`);
+}
+
+export const envs = {
+  port: value.PORT as number,
+  nodeEnv: value.NODE_ENV as string,
+
+  pg: {
+    host: value.PG_HOST as string,
+    port: value.PG_PORT as number,
+    username: value.PG_USER as string,
+    password: value.PG_PASSWORD as string,
+    database: value.PG_DATABASE as string,
+  },
+
+  jwt: {
+    secret: value.JWT_SECRET as string,
+    issuer: value.JWT_ISSUER as string,
+  },
+
+  encryptionKey: value.ENCRYPTION_KEY as string,
+  frontendUrl: value.FRONTEND_URL as string,
+
+  ai: {
+    geminiApiKey: value.GEMINI_API_KEY as string,
+    openaiApiKey: value.OPENAI_API_KEY as string,
+    anthropicApiKey: value.ANTHROPIC_API_KEY as string,
+  },
+};

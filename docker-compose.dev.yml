@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ferri-bot-postgres
+    ports:
+      - '5434:5432'
+    environment:
+      POSTGRES_USER: ferri_bot
+      POSTGRES_PASSWORD: ferri_bot_123
+      POSTGRES_DB: ferri_bot_dev
+    volumes:
+      - ferri_bot_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ferri_bot -d ferri_bot_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ferri-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ferri-bot
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      PG_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  ferri_bot_pg_data:
