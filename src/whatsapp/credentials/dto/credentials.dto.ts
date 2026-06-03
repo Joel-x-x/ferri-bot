@@ -14,3 +14,5 @@ export class UpdateCredentialsDto {
   @IsString() @IsOptional() displayName?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
 }
+
+export type CredentialsResponse = Omit<import('../../../database/entities/meta-credentials.entity').MetaCredentials, 'accessToken'>;

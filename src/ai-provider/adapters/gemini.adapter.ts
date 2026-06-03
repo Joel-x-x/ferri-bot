@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { BadRequestException } from '@nestjs/common';
 import { AiAdapter, AiMessage } from './ai-adapter.interface';
 
 export class GeminiAdapter implements AiAdapter {
@@ -12,6 +13,8 @@ export class GeminiAdapter implements AiAdapter {
   }
 
   async chat(messages: AiMessage[], systemPrompt?: string): Promise<string> {
+    if (!messages.length) throw new BadRequestException('Messages array cannot be empty');
+
     const genModel = this.client.getGenerativeModel({
       model: this.model,
       systemInstruction: systemPrompt,

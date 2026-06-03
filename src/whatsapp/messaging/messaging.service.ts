@@ -74,7 +74,7 @@ export class MessagingService {
   ): Promise<void> {
     await this.messageRepo.save({
       tenantId,
-      jid: to,
+      contactPhone: to,
       messageId,
       direction: MessageDirection.OUTBOUND,
       type,
@@ -177,15 +177,23 @@ export class MessagingService {
   }
 
   async sendBulk(tenantId: string, dto: SendBulkDto): Promise<{ sent: number; failed: number }> {
+    const { phoneNumberId, accessToken } = await this.credentialsService.findByTenant(tenantId);
     let sent = 0;
     let failed = 0;
 
     for (const item of dto.messages) {
       try {
-        await this.sendText(tenantId, { to: item.to, text: item.text });
+        const messageId = await this.graphPost(phoneNumberId, accessToken, {
+          messaging_product: 'whatsapp',
+          to: item.to,
+          type: 'text',
+          text: { body: item.text },
+        });
+        await this.saveOutbound(tenantId, item.to, messageId, MessageType.TEXT, item.text);
+        this.gateway.emitToTenant(tenantId, 'message:sent', { tenantId, to: item.to, messageId, status: 'SENT' });
         sent++;
       } catch (err) {
-        this.logger.warn(`Bulk send failed for ${item.to}: ${err.message}`);
+        this.logger.warn(`messaging.bulk_send_failed to=${item.to} error=${err.message}`);
         failed++;
       }
       await new Promise((r) => setTimeout(r, RATE_LIMIT_MS));
@@ -196,12 +204,12 @@ export class MessagingService {
 
   async getHistory(
     tenantId: string,
-    jid: string,
+    contactPhone: string,
     page = 1,
     limit = 20,
   ): Promise<{ data: MessageHistory[]; total: number; page: number; limit: number }> {
     const [data, total] = await this.messageRepo.findAndCount({
-      where: { tenantId, jid },
+      where: { tenantId, contactPhone },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -220,7 +228,7 @@ export class MessagingService {
   ): Promise<void> {
     await this.messageRepo.save({
       tenantId,
-      jid: from,
+      contactPhone: from,
       messageId,
       direction: MessageDirection.INBOUND,
       type,

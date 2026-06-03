@@ -30,7 +30,7 @@ export enum MessageStatus {
 }
 
 @Entity('message_history')
-@Index(['tenantId', 'jid'])
+@Index(['tenantId', 'contactPhone'])
 @Index(['tenantId', 'createdAt'])
 export class MessageHistory {
   @PrimaryGeneratedColumn('uuid')
@@ -39,8 +39,8 @@ export class MessageHistory {
   @Column({ name: 'tenant_id', length: 100 })
   tenantId: string;
 
-  @Column({ length: 100 })
-  jid: string;
+  @Column({ name: 'contact_phone', length: 20 })
+  contactPhone: string;
 
   @Column({ name: 'message_id', length: 100, nullable: true })
   messageId: string;

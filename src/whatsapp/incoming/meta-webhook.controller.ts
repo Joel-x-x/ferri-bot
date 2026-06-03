@@ -36,7 +36,7 @@ export class MetaWebhookController {
     if (mode === 'subscribe') {
       const valid = await this.incomingService.verifyToken(verifyToken);
       if (valid) {
-        this.logger.log(`Webhook verified for token ${verifyToken}`);
+        this.logger.log('meta.webhook_verified');
         return res.status(200).send(challenge);
       }
     }

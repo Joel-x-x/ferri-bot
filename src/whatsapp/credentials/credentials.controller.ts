@@ -23,13 +23,14 @@ export class CredentialsController {
   constructor(private readonly credentialsService: CredentialsService) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@CurrentTenant() tenantId: string, @Body() dto: CreateCredentialsDto) {
     return this.credentialsService.create(tenantId, dto);
   }
 
   @Get()
   findOne(@CurrentTenant() tenantId: string) {
-    return this.credentialsService.findByTenant(tenantId);
+    return this.credentialsService.findByTenantSafe(tenantId);
   }
 
   @Patch()

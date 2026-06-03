@@ -79,13 +79,13 @@ export class MessagingController {
     return this.messagingService.sendBulk(tenantId, dto);
   }
 
-  @Get('history/:jid')
+  @Get('history/:phone')
   getHistory(
     @CurrentTenant() tenantId: string,
-    @Param('jid') jid: string,
+    @Param('phone') phone: string,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.messagingService.getHistory(tenantId, jid, +page, +limit);
+    return this.messagingService.getHistory(tenantId, phone, +page, +limit);
   }
 }

@@ -10,13 +10,9 @@ export const WEBHOOK_EVENTS = [
   'message.received',
   'message.sent',
   'message.status',
-  'session.connected',
-  'session.disconnected',
-  'session.qr',
-  'session.logged_out',
 ] as const;
 
-export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number] | '*';
 
 @Entity('webhook_subscriptions')
 export class WebhookSubscription {

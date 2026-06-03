@@ -23,6 +23,7 @@ export class AiProviderController {
   constructor(private readonly aiProviderService: AiProviderService) {}
 
   @Post('provider')
+  @HttpCode(HttpStatus.CREATED)
   upsert(@CurrentTenant() tenantId: string, @Body() dto: UpsertAiProviderDto) {
     return this.aiProviderService.upsert(tenantId, dto);
   }

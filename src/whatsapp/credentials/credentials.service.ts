@@ -6,7 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MetaCredentials } from '../../database/entities/meta-credentials.entity';
-import { CreateCredentialsDto, UpdateCredentialsDto } from './dto/credentials.dto';
+import { encrypt, decrypt } from '../../shared/utils/crypto.util';
+import { envs } from '../../config/envs';
+import { CreateCredentialsDto, UpdateCredentialsDto, CredentialsResponse } from './dto/credentials.dto';
 
 @Injectable()
 export class CredentialsService {
@@ -15,34 +17,61 @@ export class CredentialsService {
     private readonly repo: Repository<MetaCredentials>,
   ) {}
 
-  async create(tenantId: string, dto: CreateCredentialsDto): Promise<MetaCredentials> {
+  async create(tenantId: string, dto: CreateCredentialsDto): Promise<CredentialsResponse> {
     const existing = await this.repo.findOne({ where: { tenantId } });
     if (existing) throw new ConflictException('Credentials already exist for this tenant');
-    return this.repo.save({ ...dto, tenantId });
+    const saved = await this.repo.save({
+      ...dto,
+      tenantId,
+      accessToken: encrypt(dto.accessToken, envs.encryptionKey),
+    });
+    return this.sanitize(saved);
   }
 
   async findByTenant(tenantId: string): Promise<MetaCredentials> {
     const creds = await this.repo.findOne({ where: { tenantId } });
     if (!creds) throw new NotFoundException('No credentials found for this tenant');
+    creds.accessToken = decrypt(creds.accessToken, envs.encryptionKey);
     return creds;
   }
 
+  async findByTenantSafe(tenantId: string): Promise<CredentialsResponse> {
+    const creds = await this.repo.findOne({ where: { tenantId } });
+    if (!creds) throw new NotFoundException('No credentials found for this tenant');
+    return this.sanitize(creds);
+  }
+
   async findByPhoneNumberId(phoneNumberId: string): Promise<MetaCredentials | null> {
-    return this.repo.findOne({ where: { phoneNumberId, isActive: true } });
+    const creds = await this.repo.findOne({ where: { phoneNumberId, isActive: true } });
+    if (!creds) return null;
+    creds.accessToken = decrypt(creds.accessToken, envs.encryptionKey);
+    return creds;
   }
 
   async findByVerifyToken(verifyToken: string): Promise<MetaCredentials | null> {
     return this.repo.findOne({ where: { verifyToken, isActive: true } });
   }
 
-  async update(tenantId: string, dto: UpdateCredentialsDto): Promise<MetaCredentials> {
-    const creds = await this.findByTenant(tenantId);
-    Object.assign(creds, dto);
-    return this.repo.save(creds);
+  async update(tenantId: string, dto: UpdateCredentialsDto): Promise<CredentialsResponse> {
+    const creds = await this.repo.findOne({ where: { tenantId } });
+    if (!creds) throw new NotFoundException('No credentials found for this tenant');
+    if (dto.accessToken) {
+      creds.accessToken = encrypt(dto.accessToken, envs.encryptionKey);
+    }
+    const { accessToken: _, ...rest } = dto;
+    Object.assign(creds, rest);
+    const saved = await this.repo.save(creds);
+    return this.sanitize(saved);
   }
 
   async remove(tenantId: string): Promise<void> {
-    const creds = await this.findByTenant(tenantId);
+    const creds = await this.repo.findOne({ where: { tenantId } });
+    if (!creds) throw new NotFoundException('No credentials found for this tenant');
     await this.repo.remove(creds);
+  }
+
+  private sanitize(entity: MetaCredentials): CredentialsResponse {
+    const { accessToken: _, ...safe } = entity;
+    return safe as CredentialsResponse;
   }
 }

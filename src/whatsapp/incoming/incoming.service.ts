@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { MessagingService } from '../messaging/messaging.service';
 import { WebhookService } from '../webhook/webhook.service';
 import { WhatsappGateway } from '../gateway/whatsapp.gateway';
@@ -140,7 +141,7 @@ export class IncomingService {
       this.conversationHistory.set(historyKey, history);
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResponse });
-      await this.messagingService.saveInbound(tenantId, from, '', MessageType.TEXT, aiResponse, undefined, true);
+      await this.messagingService.saveInbound(tenantId, from, randomUUID(), MessageType.TEXT, aiResponse, undefined, true);
     } catch (err) {
       this.logger.warn(`AI reply failed for ${tenantId}:${from}: ${err.message}`);
     }

@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import { BadRequestException } from '@nestjs/common';
 import { AiAdapter, AiMessage } from './ai-adapter.interface';
 
 export class CustomAdapter implements AiAdapter {
@@ -9,18 +10,23 @@ export class CustomAdapter implements AiAdapter {
   ) {}
 
   async chat(messages: AiMessage[], systemPrompt?: string): Promise<string> {
-    const response = await axios.post(
-      `${this.baseUrl}/chat`,
-      { messages, systemPrompt, model: this.model },
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/chat`,
+        { messages, systemPrompt, model: this.model },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30_000,
         },
-        timeout: 30_000,
-      },
-    );
-
-    return response.data?.content ?? response.data?.message ?? String(response.data);
+      );
+      return response.data?.content ?? response.data?.message ?? String(response.data);
+    } catch (err) {
+      const axiosErr = err as AxiosError<any>;
+      const detail = axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? axiosErr.message;
+      throw new BadRequestException(`Custom AI provider error: ${detail}`);
+    }
   }
 }
