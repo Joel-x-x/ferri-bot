@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
 import {
-  MessageHistoryEntityEntity,
+  MessageHistoryEntity,
   MessageDirection,
   MessageType,
   MessageStatus,
@@ -210,14 +210,14 @@ export class MessagingService {
     contactPhone: string,
     page = 1,
     limit = 20,
-  ): Promise<{ data: MessageHistoryEntity[]; total: number; page: number; limit: number }> {
-    const [data, total] = await this.messageRepo.findAndCount({
+  ): Promise<{ items: MessageHistoryEntity[]; total: number; page: number; limit: number; totalPages: number }> {
+    const [items, total] = await this.messageRepo.findAndCount({
       where: { tenantId, contactPhone },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
-    return { data, total, page, limit };
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async saveAiOutbound(

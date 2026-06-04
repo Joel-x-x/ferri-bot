@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MetaCredentialsEntityEntity } from '../../database/entities/meta-credentials.entity';
+import { MetaCredentialsEntity } from '../../database/entities/meta-credentials.entity';
 import { encrypt, decrypt } from '../../shared/utils/crypto.util';
 import { envs } from '../../config/envs';
 import { CreateCredentialsRequest, UpdateCredentialsRequest, CredentialsResponse } from './dto/credentials.dto';

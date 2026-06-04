@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
 import axios from 'axios';
-import { WebhookSubscriptionEntityEntity } from '../../database/entities/webhook-subscription.entity';
+import { WebhookSubscriptionEntity } from '../../database/entities/webhook-subscription.entity';
 import { CreateWebhookRequest, UpdateWebhookRequest } from './dto/webhook.dto';
 
 @Injectable()

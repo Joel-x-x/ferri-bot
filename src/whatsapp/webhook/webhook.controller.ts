@@ -24,6 +24,7 @@ export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@CurrentTenant() tenantId: string, @Body() dto: CreateWebhookRequest) {
     return this.webhookService.create(tenantId, dto);
   }
