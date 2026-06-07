@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import axios, { AxiosError } from 'axios';
@@ -59,7 +59,7 @@ export class MessagingService {
         throw new BadRequestException(metaError?.message ?? 'Invalid message payload');
       }
       if (status === 429) {
-        throw new BadRequestException('Meta API rate limit exceeded — try again later');
+        throw new HttpException('Meta API rate limit exceeded — try again later', HttpStatus.TOO_MANY_REQUESTS);
       }
       this.logger.error(`meta.graph_post_failed status=${status} error=${metaError?.message ?? err.message}`);
       throw err;

@@ -8,8 +8,18 @@ import {
 const ALGORITHM = 'aes-256-cbc';
 const SALT = 'ferri-bot-salt-v1';
 
+// Cache derived key — ENCRYPTION_KEY and salt are constant for the process lifetime.
+// scryptSync is intentionally expensive (~20-50ms); calling it per-operation would
+// add latency to every credential lookup.
+const keyCache = new Map<string, Buffer>();
+
 function deriveKey(encryptionKey: string): Buffer {
-  return scryptSync(encryptionKey, SALT, 32) as Buffer;
+  let key = keyCache.get(encryptionKey);
+  if (!key) {
+    key = scryptSync(encryptionKey, SALT, 32) as Buffer;
+    keyCache.set(encryptionKey, key);
+  }
+  return key;
 }
 
 export function encrypt(text: string, encryptionKey: string): string {

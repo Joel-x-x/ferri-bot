@@ -26,7 +26,6 @@ export class SendDocumentRequest {
   @IsString() @IsNotEmpty() @toPhone() to: string;
   @IsUrl() url: string;
   @IsString() @IsNotEmpty() filename: string;
-  @IsString() @IsNotEmpty() mimetype: string;
 }
 
 export class SendReplyRequest {

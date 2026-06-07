@@ -21,9 +21,6 @@ const schema = Joi.object({
 
   META_API_VERSION: Joi.string().default('v22.0'),
 
-  GEMINI_API_KEY: Joi.string().allow('').optional(),
-  OPENAI_API_KEY: Joi.string().allow('').optional(),
-  ANTHROPIC_API_KEY: Joi.string().allow('').optional(),
 });
 
 const { error, value } = schema.validate(process.env, { allowUnknown: true });
@@ -54,11 +51,5 @@ export const envs = {
 
   meta: {
     apiVersion: value.META_API_VERSION as string,
-  },
-
-  ai: {
-    geminiApiKey: value.GEMINI_API_KEY as string,
-    openaiApiKey: value.OPENAI_API_KEY as string,
-    anthropicApiKey: value.ANTHROPIC_API_KEY as string,
   },
 };
