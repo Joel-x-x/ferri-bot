@@ -1,6 +1,8 @@
 import {
   Injectable,
   NotFoundException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -76,7 +78,27 @@ export class AiProviderService {
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
     const adapter = AiProviderFactory.create(entity, decryptedKey);
-    return adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
+    try {
+      return await adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
+    } catch (err) {
+      throw new HttpException(
+        this.extractAiError(err),
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
+  private extractAiError(err: unknown): string {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests'))
+      return 'AI provider quota exceeded — check your plan or billing';
+    if (msg.includes('401') || msg.includes('API key') || msg.includes('invalid'))
+      return 'AI provider API key invalid or unauthorized';
+    if (msg.includes('404') || msg.includes('not found'))
+      return `AI model not found — check the model name in your provider config`;
+    if (msg.includes('503') || msg.includes('overloaded'))
+      return 'AI provider temporarily unavailable — try again later';
+    return `AI provider error: ${msg}`;
   }
 
   /**

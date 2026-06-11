@@ -59,6 +59,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       409: 'CONFLICT',
       422: 'UNPROCESSABLE_ENTITY',
       429: 'TOO_MANY_REQUESTS',
+      502: 'AI_PROVIDER_ERROR',
     };
     return codes[status] ?? 'INTERNAL_ERROR';
   }
