@@ -262,4 +262,24 @@ export class MessagingService {
   async updateMessageStatus(tenantId: string, messageId: string, status: MessageStatus): Promise<void> {
     await this.messageRepo.update({ tenantId, messageId }, { status });
   }
+
+  async getConversationContext(
+    tenantId: string,
+    contactPhone: string,
+    limit = 20,
+  ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+    const messages = await this.messageRepo.find({
+      where: { tenantId, contactPhone },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+
+    return messages
+      .reverse()
+      .filter((m) => m.content)
+      .map((m) => ({
+        role: m.direction === MessageDirection.INBOUND ? 'user' : 'assistant',
+        content: m.content,
+      }));
+  }
 }

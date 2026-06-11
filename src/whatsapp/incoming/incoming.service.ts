@@ -9,9 +9,6 @@ import { MessageType, MessageStatus } from '../../database/entities/message-hist
 @Injectable()
 export class IncomingService {
   private readonly logger = new Logger(IncomingService.name);
-  private conversationHistory = new Map<string, Array<{ role: 'user' | 'assistant'; content: string }>>();
-  private readonly MAX_HISTORY = 20;
-  private readonly MAX_CONVERSATIONS = 500;
 
   constructor(
     private readonly messagingService: MessagingService,
@@ -122,26 +119,9 @@ export class IncomingService {
     if (!content) return;
 
     try {
-      const historyKey = `${tenantId}:${from}`;
-      const history = this.conversationHistory.get(historyKey) ?? [];
-
-      // Evict oldest conversation if map is at capacity
-      if (!this.conversationHistory.has(historyKey) && this.conversationHistory.size >= this.MAX_CONVERSATIONS) {
-        const oldestKey = this.conversationHistory.keys().next().value;
-        this.conversationHistory.delete(oldestKey);
-      }
-
-      history.push({ role: 'user', content });
-      if (history.length > this.MAX_HISTORY) history.shift();
-      this.conversationHistory.set(historyKey, history);
-
-      // Single DB query: checks isActive + autoReply, returns null if disabled
+      const history = await this.messagingService.getConversationContext(tenantId, from);
       const aiResponse = await this.aiProviderService.chatIfAutoReply(tenantId, history);
       if (!aiResponse) return;
-
-      history.push({ role: 'assistant', content: aiResponse });
-      if (history.length > this.MAX_HISTORY) history.shift();
-      this.conversationHistory.set(historyKey, history);
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResponse });
       await this.messagingService.saveAiOutbound(tenantId, from, aiResponse);
