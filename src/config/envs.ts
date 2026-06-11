@@ -21,6 +21,10 @@ const schema = Joi.object({
 
   META_API_VERSION: Joi.string().default('v22.0'),
 
+  ALGOLIA_APP_ID: Joi.string().required(),
+  ALGOLIA_SEARCH_KEY: Joi.string().required(),
+  ALGOLIA_INDEX_NAME: Joi.string().default('products'),
+
 });
 
 const { error, value } = schema.validate(process.env, { allowUnknown: true });
@@ -51,5 +55,11 @@ export const envs = {
 
   meta: {
     apiVersion: value.META_API_VERSION as string,
+  },
+
+  algolia: {
+    appId: value.ALGOLIA_APP_ID as string,
+    searchKey: value.ALGOLIA_SEARCH_KEY as string,
+    indexName: value.ALGOLIA_INDEX_NAME as string,
   },
 };

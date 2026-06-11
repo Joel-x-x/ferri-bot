@@ -120,11 +120,14 @@ export class IncomingService {
 
     try {
       const history = await this.messagingService.getConversationContext(tenantId, from);
-      const aiResponse = await this.aiProviderService.chatIfAutoReply(tenantId, history);
-      if (!aiResponse) return;
+      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history);
+      if (!aiResult) return;
 
-      await this.messagingService.sendText(tenantId, { to: from, text: aiResponse });
-      await this.messagingService.saveAiOutbound(tenantId, from, aiResponse);
+      await this.messagingService.sendText(tenantId, { to: from, text: aiResult.text });
+      if (aiResult.imageUrl) {
+        await this.messagingService.sendImage(tenantId, { to: from, url: aiResult.imageUrl });
+      }
+      await this.messagingService.saveAiOutbound(tenantId, from, aiResult.text);
     } catch (err) {
       this.logger.warn(`ai.reply_failed tenant=${tenantId} from=${from} error=${err.message}`);
     }

@@ -10,14 +10,33 @@ import { AiProviderEntity } from '../database/entities/ai-provider.entity';
 import { encrypt, decrypt } from '../shared/utils/crypto.util';
 import { envs } from '../config/envs';
 import { AiProviderFactory } from './ai-provider.factory';
-import { AiMessage } from './adapters/ai-adapter.interface';
+import { AiChatResult, AiMessage, AiTool, AiToolExecutor } from './adapters/ai-adapter.interface';
 import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
+import { AlgoliaService } from '../algolia/algolia.service';
+
+const WHATSAPP_BASE_PROMPT = `Eres un asistente virtual de atención al cliente para una tienda de ferretería. Siempre identifícate como un bot cuando te lo pregunten. Sé amable, conciso y concreto — prioriza respuestas cortas. Cuando el cliente consulte precios, productos o disponibilidad usa la herramienta search_products para buscar. Muestra hasta 5 resultados con nombre, precio, disponibilidad e indica cómo puede ordenar (por WhatsApp o visitando la tienda).`;
+
+const SEARCH_PRODUCTS_TOOL: AiTool = {
+  name: 'search_products',
+  description: 'Busca productos en el catálogo de la ferretería por nombre, categoría o descripción. Úsala cuando el cliente pregunte sobre precios, disponibilidad o productos específicos.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Término de búsqueda: nombre del producto, categoría o descripción',
+      },
+    },
+    required: ['query'],
+  },
+};
 
 @Injectable()
 export class AiProviderService {
   constructor(
     @InjectRepository(AiProviderEntity)
     private readonly providerRepo: Repository<AiProviderEntity>,
+    private readonly algoliaService: AlgoliaService,
   ) {}
 
   async upsert(
@@ -79,7 +98,8 @@ export class AiProviderService {
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
     const adapter = AiProviderFactory.create(entity, decryptedKey);
     try {
-      return await adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
+      const result = await adapter.chat(messages, systemPrompt ?? entity.systemPrompt);
+      return result.text;
     } catch (err) {
       throw new HttpException(
         this.extractAiError(err),
@@ -102,20 +122,37 @@ export class AiProviderService {
   }
 
   /**
-   * Single-query path for auto-reply flow.
+   * Auto-reply path: includes Algolia product search tool.
    * Returns null if provider not found, inactive, or autoReply disabled.
-   * Avoids the double findOne that getProvider() + chat() would require.
    */
   async chatIfAutoReply(
     tenantId: string,
     messages: AiMessage[],
-  ): Promise<string | null> {
+  ): Promise<AiChatResult | null> {
     const entity = await this.providerRepo.findOne({ where: { tenantId, isActive: true } });
     if (!entity?.autoReply) return null;
 
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
     const adapter = AiProviderFactory.create(entity, decryptedKey);
-    return adapter.chat(messages, entity.systemPrompt);
+
+    const systemPrompt = [WHATSAPP_BASE_PROMPT, entity.systemPrompt]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const toolExecutor: AiToolExecutor = {
+      execute: async (name, args) => {
+        if (name === 'search_products') {
+          const query = String(args['query'] ?? '');
+          const hits = await this.algoliaService.searchProducts(query, tenantId);
+          const content = this.algoliaService.formatProductsForAi(hits);
+          const imageUrl = hits[0]?.imageUrl;
+          return { content, imageUrl };
+        }
+        return { content: `Tool "${name}" not found.` };
+      },
+    };
+
+    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL], toolExecutor);
   }
 
   private sanitize(entity: AiProviderEntity): Omit<AiProviderEntity, 'apiKey'> {

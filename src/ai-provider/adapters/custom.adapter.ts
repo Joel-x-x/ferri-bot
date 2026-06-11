@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { BadRequestException } from '@nestjs/common';
-import { AiAdapter, AiMessage } from './ai-adapter.interface';
+import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor } from './ai-adapter.interface';
 
 export class CustomAdapter implements AiAdapter {
   constructor(
@@ -9,7 +9,12 @@ export class CustomAdapter implements AiAdapter {
     private readonly model: string,
   ) {}
 
-  async chat(messages: AiMessage[], systemPrompt?: string): Promise<string> {
+  async chat(
+    messages: AiMessage[],
+    systemPrompt?: string,
+    _tools?: AiTool[],
+    _toolExecutor?: AiToolExecutor,
+  ): Promise<AiChatResult> {
     try {
       const response = await axios.post(
         `${this.baseUrl}/chat`,
@@ -22,7 +27,8 @@ export class CustomAdapter implements AiAdapter {
           timeout: 30_000,
         },
       );
-      return response.data?.content ?? response.data?.message ?? String(response.data);
+      const text = response.data?.content ?? response.data?.message ?? String(response.data);
+      return { text };
     } catch (err) {
       const axiosErr = err as AxiosError<any>;
       const detail = axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? axiosErr.message;
