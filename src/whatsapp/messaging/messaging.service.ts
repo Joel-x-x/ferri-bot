@@ -263,6 +263,11 @@ export class MessagingService {
     await this.messageRepo.update({ tenantId, messageId }, { status });
   }
 
+  async isFirstContact(tenantId: string, contactPhone: string): Promise<boolean> {
+    const count = await this.messageRepo.count({ where: { tenantId, contactPhone } });
+    return count === 1; // only the message we just saved
+  }
+
   async getConversationContext(
     tenantId: string,
     contactPhone: string,

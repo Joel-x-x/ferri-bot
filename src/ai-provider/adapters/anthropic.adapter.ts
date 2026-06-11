@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor } from './ai-adapter.interface';
+import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor, VendorNotification } from './ai-adapter.interface';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -26,6 +26,7 @@ export class AnthropicAdapter implements AiAdapter {
     }));
 
     let imageUrl: string | undefined;
+    let vendorNotification: VendorNotification | undefined;
     const chatMessages: Anthropic.MessageParam[] = messages.map((m) => ({
       role: m.role,
       content: m.content,
@@ -48,6 +49,7 @@ export class AnthropicAdapter implements AiAdapter {
           if (block.type === 'tool_use') {
             const execResult = await toolExecutor.execute(block.name, block.input as Record<string, unknown>);
             if (!imageUrl && execResult.imageUrl) imageUrl = execResult.imageUrl;
+            if (!vendorNotification && execResult.vendorNotification) vendorNotification = execResult.vendorNotification;
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
@@ -59,10 +61,10 @@ export class AnthropicAdapter implements AiAdapter {
       } else {
         const block = response.content[0];
         const text = block?.type === 'text' ? block.text : '';
-        return { text, imageUrl };
+        return { text, imageUrl, vendorNotification };
       }
     }
 
-    return { text: '', imageUrl };
+    return { text: '', imageUrl, vendorNotification };
   }
 }

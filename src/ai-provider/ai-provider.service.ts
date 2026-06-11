@@ -14,7 +14,26 @@ import { AiChatResult, AiMessage, AiTool, AiToolExecutor } from './adapters/ai-a
 import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
 import { AlgoliaService } from '../algolia/algolia.service';
 
-const WHATSAPP_BASE_PROMPT = `Eres un asistente virtual de atención al cliente para una tienda de ferretería. Siempre identifícate como un bot cuando te lo pregunten. Sé amable, conciso y concreto — prioriza respuestas cortas. Cuando el cliente consulte precios, productos o disponibilidad usa la herramienta search_products para buscar. Muestra hasta 5 resultados con nombre, precio, disponibilidad e indica cómo puede ordenar (por WhatsApp o visitando la tienda).`;
+const WHATSAPP_BASE_PROMPT = `Eres FerriBot, asistente virtual de atención al cliente de una ferretería. Siempre identifícate como bot si te lo preguntan.
+
+REGLAS DE RESPUESTA:
+- Respuestas cortas y concretas por defecto. Solo da detalles si el cliente los pide explícitamente.
+- Usa formato WhatsApp: negrillas pegadas al texto *así*, no * así *.
+- Precios son siempre referenciales, nunca garantizados.
+
+BÚSQUEDA DE PRODUCTOS:
+- Cuando el cliente pregunte por precios, disponibilidad o productos, usa search_products.
+- Muestra máximo 5 resultados.
+- Si hay imagen del producto principal, se enviará automáticamente.
+
+COTIZACIÓN:
+- Acumula los productos que el cliente pide cotizar a lo largo de la conversación.
+- Cuando el cliente indique que terminó, presenta el resumen con la lista de productos, cantidades y total estimado.
+- Luego pregunta: "¿Deseas que envíe esta cotización a un asesor?"
+- Si responde que sí, llama a la herramienta send_quotation con los detalles y confirma: "✅ Cotización enviada. Un asesor te contactará pronto."
+
+HANDOFF:
+- Si el cliente pide hablar con una persona, responde: "Claro, te comunico con un asesor. Escríbenos al *0960801963* o espera que te contactemos pronto."`;
 
 const SEARCH_PRODUCTS_TOOL: AiTool = {
   name: 'search_products',
@@ -28,6 +47,25 @@ const SEARCH_PRODUCTS_TOOL: AiTool = {
       },
     },
     required: ['query'],
+  },
+};
+
+const SEND_QUOTATION_TOOL: AiTool = {
+  name: 'send_quotation',
+  description: 'Envía la cotización confirmada al asesor de ventas. Llama esta herramienta solo cuando el cliente haya confirmado explícitamente que desea enviar la cotización.',
+  parameters: {
+    type: 'object',
+    properties: {
+      items: {
+        type: 'string',
+        description: 'Lista de productos con cantidades, uno por línea. Ej: "Cemento Chimborazo × 3\\nTornillo hex 1/2 × 100"',
+      },
+      total: {
+        type: 'string',
+        description: 'Total estimado en formato "$XX.XX" o "No disponible" si no se pudo calcular',
+      },
+    },
+    required: ['items', 'total'],
   },
 };
 
@@ -122,12 +160,13 @@ export class AiProviderService {
   }
 
   /**
-   * Auto-reply path: includes Algolia product search tool.
+   * Auto-reply path: includes Algolia search + quotation tools.
    * Returns null if provider not found, inactive, or autoReply disabled.
    */
   async chatIfAutoReply(
     tenantId: string,
     messages: AiMessage[],
+    contactPhone: string,
   ): Promise<AiChatResult | null> {
     const entity = await this.providerRepo.findOne({ where: { tenantId, isActive: true } });
     if (!entity?.autoReply) return null;
@@ -148,11 +187,21 @@ export class AiProviderService {
           const imageUrl = hits[0]?.imageUrl;
           return { content, imageUrl };
         }
+
+        if (name === 'send_quotation') {
+          const items = String(args['items'] ?? '');
+          const total = String(args['total'] ?? 'No disponible');
+          return {
+            content: 'Cotización enviada al asesor.',
+            vendorNotification: { items, total, clientPhone: contactPhone },
+          };
+        }
+
         return { content: `Tool "${name}" not found.` };
       },
     };
 
-    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL], toolExecutor);
+    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL, SEND_QUOTATION_TOOL], toolExecutor);
   }
 
   private sanitize(entity: AiProviderEntity): Omit<AiProviderEntity, 'apiKey'> {

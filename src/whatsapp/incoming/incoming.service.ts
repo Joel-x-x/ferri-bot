@@ -6,6 +6,18 @@ import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import { MessageType, MessageStatus } from '../../database/entities/message-history.entity';
 
+// TODO: make this a per-tenant field (salesPhone in meta_credentials or tenant_config)
+const VENDOR_PHONE = '0960801963';
+
+const WELCOME_MESSAGE = `¡Hola! 👋 Soy *FerriBot*, tu asistente virtual.
+
+Puedo ayudarte con:
+*1.* Consultar precios y disponibilidad
+*2.* Hacer una cotización
+*3.* Hablar con un asesor
+
+¿En qué te ayudo?`;
+
 @Injectable()
 export class IncomingService {
   private readonly logger = new Logger(IncomingService.name);
@@ -119,17 +131,35 @@ export class IncomingService {
     if (!content) return;
 
     try {
+      const isFirst = await this.messagingService.isFirstContact(tenantId, from);
+      if (isFirst) {
+        await this.messagingService.sendText(tenantId, { to: from, text: WELCOME_MESSAGE });
+        await this.messagingService.saveAiOutbound(tenantId, from, WELCOME_MESSAGE);
+        this.logger.log(`ferribot.welcome_sent tenant=${tenantId} to=${from}`);
+      }
+
       const history = await this.messagingService.getConversationContext(tenantId, from);
-      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history);
+      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history, from);
       if (!aiResult) return;
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResult.text });
       if (aiResult.imageUrl) {
         await this.messagingService.sendImage(tenantId, { to: from, url: aiResult.imageUrl });
       }
+      if (aiResult.vendorNotification) {
+        const { items, total, clientPhone } = aiResult.vendorNotification;
+        const vendorMsg = this.buildVendorMessage(clientPhone, items, total);
+        await this.messagingService.sendText(tenantId, { to: VENDOR_PHONE, text: vendorMsg });
+        this.logger.log(`ferribot.quotation_sent tenant=${tenantId} client=${from} vendor=${VENDOR_PHONE}`);
+      }
       await this.messagingService.saveAiOutbound(tenantId, from, aiResult.text);
     } catch (err) {
       this.logger.warn(`ai.reply_failed tenant=${tenantId} from=${from} error=${err.message}`);
     }
+  }
+
+  private buildVendorMessage(clientPhone: string, items: string, total: string): string {
+    const now = new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' });
+    return `🔔 *Nueva cotización vía FerriBot*\n\nCliente: ${clientPhone}\n\nProductos:\n${items}\n\n*Total estimado: ${total}*\n\n_${now}_`;
   }
 }

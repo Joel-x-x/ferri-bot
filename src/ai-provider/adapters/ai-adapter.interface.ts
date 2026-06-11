@@ -3,9 +3,16 @@ export interface AiMessage {
   content: string;
 }
 
+export interface VendorNotification {
+  items: string;
+  total: string;
+  clientPhone: string;
+}
+
 export interface AiChatResult {
   text: string;
   imageUrl?: string;
+  vendorNotification?: VendorNotification;
 }
 
 export interface AiTool {
@@ -17,6 +24,7 @@ export interface AiTool {
 export interface AiToolExecutorResult {
   content: string;   // string fed back to the AI
   imageUrl?: string; // attached to the final WhatsApp reply
+  vendorNotification?: VendorNotification; // triggers vendor WhatsApp notification
 }
 
 export interface AiToolExecutor {

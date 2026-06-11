@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
 import { BadRequestException } from '@nestjs/common';
-import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor } from './ai-adapter.interface';
+import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor, VendorNotification } from './ai-adapter.interface';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -41,6 +41,7 @@ export class GeminiAdapter implements AiAdapter {
 
     const chat = genModel.startChat({ history });
     let imageUrl: string | undefined;
+    let vendorNotification: VendorNotification | undefined;
 
     // Initial user message
     let nextMessage: string | Part[] = messages[messages.length - 1].content;
@@ -51,13 +52,14 @@ export class GeminiAdapter implements AiAdapter {
       const functionCalls = response.functionCalls();
 
       if (!functionCalls?.length || !toolExecutor) {
-        return { text: response.text(), imageUrl };
+        return { text: response.text(), imageUrl, vendorNotification };
       }
 
       const functionResponseParts: Part[] = [];
       for (const call of functionCalls) {
         const execResult = await toolExecutor.execute(call.name, call.args as Record<string, unknown>);
         if (!imageUrl && execResult.imageUrl) imageUrl = execResult.imageUrl;
+        if (!vendorNotification && execResult.vendorNotification) vendorNotification = execResult.vendorNotification;
         functionResponseParts.push({
           functionResponse: {
             name: call.name,
@@ -71,6 +73,6 @@ export class GeminiAdapter implements AiAdapter {
 
     // Fallback: last response text
     const final = await chat.sendMessage(nextMessage);
-    return { text: final.response.text(), imageUrl };
+    return { text: final.response.text(), imageUrl, vendorNotification };
   }
 }

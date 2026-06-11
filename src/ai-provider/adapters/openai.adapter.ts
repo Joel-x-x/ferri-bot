@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor } from './ai-adapter.interface';
+import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor, VendorNotification } from './ai-adapter.interface';
 
 const MAX_TOOL_ROUNDS = 5;
 
@@ -36,6 +36,7 @@ export class OpenAiAdapter implements AiAdapter {
     }));
 
     let imageUrl: string | undefined;
+    let vendorNotification: VendorNotification | undefined;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const response = await this.client.chat.completions.create({
@@ -53,6 +54,7 @@ export class OpenAiAdapter implements AiAdapter {
           const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
           const execResult = await toolExecutor.execute(toolCall.function.name, args);
           if (!imageUrl && execResult.imageUrl) imageUrl = execResult.imageUrl;
+          if (!vendorNotification && execResult.vendorNotification) vendorNotification = execResult.vendorNotification;
           chatMessages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -60,10 +62,10 @@ export class OpenAiAdapter implements AiAdapter {
           });
         }
       } else {
-        return { text: choice.message.content ?? '', imageUrl };
+        return { text: choice.message.content ?? '', imageUrl, vendorNotification };
       }
     }
 
-    return { text: '', imageUrl };
+    return { text: '', imageUrl, vendorNotification };
   }
 }
