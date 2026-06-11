@@ -1,0 +1,77 @@
+name: Deploy to Production (IONOS VPS)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ferri-bot
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase owner
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Build and push ferri-bot
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          no-cache: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.name }}/ferri-bot:latest
+            ghcr.io/${{ steps.owner.outputs.name }}/ferri-bot:${{ github.sha }}
+
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key_path: /tmp/deploy_key
+          envs: GHCR_TOKEN,GITHUB_ACTOR
+          script: |
+            set -e
+            mkdir -p /tmp/.docker-deploy
+            echo "$GHCR_TOKEN" | docker --config /tmp/.docker-deploy login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            flock -w 180 /tmp/ferri-bot-deploy.lock sh -c '
+              set -e
+              cd /home/prod/ferridescuentos
+              docker --config /tmp/.docker-deploy compose -f docker-compose.prod.yml --project-name ferridescuentos pull ferri-bot
+              docker compose -f docker-compose.prod.yml --project-name ferridescuentos up -d --no-deps ferri-bot
+              docker system prune -f
+            '
+            rm -rf /tmp/.docker-deploy
+            echo "--- Verify ---"
+            docker ps --filter "name=ferri-bot" --format "{{.Status}}" | grep -q "Up" || (echo "Container not running!" && exit 1)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
