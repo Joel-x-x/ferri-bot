@@ -268,17 +268,23 @@ export class MessagingService {
     contactPhone: string,
     limit = 20,
   ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
-    const messages = await this.messageRepo.find({
-      where: { tenantId, contactPhone },
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
+    const messages = await this.messageRepo
+      .createQueryBuilder('m')
+      .where('m.tenantId = :tenantId', { tenantId })
+      .andWhere('m.contactPhone = :contactPhone', { contactPhone })
+      .andWhere('m.content IS NOT NULL')
+      .andWhere('(m.direction = :inbound OR (m.direction = :outbound AND m.aiProcessed = true))', {
+        inbound: MessageDirection.INBOUND,
+        outbound: MessageDirection.OUTBOUND,
+      })
+      .orderBy('m.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
 
     return messages
       .reverse()
-      .filter((m) => m.content)
       .map((m) => ({
-        role: m.direction === MessageDirection.INBOUND ? 'user' : 'assistant',
+        role: m.direction === MessageDirection.INBOUND ? 'user' : ('assistant' as const),
         content: m.content,
       }));
   }
