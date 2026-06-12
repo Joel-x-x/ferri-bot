@@ -13,6 +13,7 @@ export class UpdateCredentialsRequest {
   @IsString() @IsOptional() accessToken?: string;
   @IsString() @IsOptional() verifyToken?: string;
   @IsString() @IsOptional() displayName?: string;
+  @IsString() @IsOptional() salesPhone?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
 }
 

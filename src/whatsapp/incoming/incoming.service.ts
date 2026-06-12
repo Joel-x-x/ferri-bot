@@ -6,9 +6,6 @@ import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import { MessageType, MessageStatus } from '../../database/entities/message-history.entity';
 
-// TODO: make this a per-tenant field (salesPhone in meta_credentials or tenant_config)
-const VENDOR_PHONE = '0960801963';
-
 const WELCOME_MESSAGE = `¡Hola! 👋 Soy *FerriBot*, tu asistente virtual.
 
 Puedo ayudarte con:
@@ -56,7 +53,7 @@ export class IncomingService {
           const { tenantId } = creds;
 
           for (const msg of value?.messages ?? []) {
-            await this.handleMessage(tenantId, msg).catch((err) =>
+            await this.handleMessage(tenantId, creds.salesPhone, msg).catch((err) =>
               this.logger.error(`meta.message_handling_failed tenant=${tenantId} error=${err.message}`),
             );
           }
@@ -73,7 +70,7 @@ export class IncomingService {
     }
   }
 
-  private async handleMessage(tenantId: string, msg: any): Promise<void> {
+  private async handleMessage(tenantId: string, salesPhone: string | null, msg: any): Promise<void> {
     const from: string = msg.from;
     const messageId: string = msg.id;
     const { type, content, mediaUrl } = this.extractContent(msg);
@@ -83,7 +80,7 @@ export class IncomingService {
     const payload = { tenantId, from, messageId, type, content, mediaUrl, timestamp: msg.timestamp };
     this.gateway.emitToTenant(tenantId, 'message:received', payload);
     await this.webhookService.dispatch(tenantId, 'message.received', payload);
-    await this.processAiReply(tenantId, from, content);
+    await this.processAiReply(tenantId, from, salesPhone, content);
   }
 
   private async handleStatus(tenantId: string, status: any): Promise<void> {
@@ -127,7 +124,7 @@ export class IncomingService {
     }
   }
 
-  private async processAiReply(tenantId: string, from: string, content?: string): Promise<void> {
+  private async processAiReply(tenantId: string, from: string, salesPhone: string | null, content?: string): Promise<void> {
     if (!content) return;
 
     try {
@@ -146,11 +143,11 @@ export class IncomingService {
       if (aiResult.imageUrl) {
         await this.messagingService.sendImage(tenantId, { to: from, url: aiResult.imageUrl });
       }
-      if (aiResult.vendorNotification) {
+      if (aiResult.vendorNotification && salesPhone) {
         const { items, total, clientPhone } = aiResult.vendorNotification;
         const vendorMsg = this.buildVendorMessage(clientPhone, items, total);
-        await this.messagingService.sendText(tenantId, { to: VENDOR_PHONE, text: vendorMsg });
-        this.logger.log(`ferribot.quotation_sent tenant=${tenantId} client=${from} vendor=${VENDOR_PHONE}`);
+        await this.messagingService.sendText(tenantId, { to: salesPhone, text: vendorMsg });
+        this.logger.log(`ferribot.quotation_sent tenant=${tenantId} client=${from} vendor=${salesPhone}`);
       }
       await this.messagingService.saveAiOutbound(tenantId, from, aiResult.text);
     } catch (err) {

@@ -32,6 +32,9 @@ export class MetaCredentialsEntity {
   @Column({ name: 'display_name', length: 100, nullable: true })
   displayName: string;
 
+  @Column({ name: 'sales_phone', length: 20, nullable: true })
+  salesPhone: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
