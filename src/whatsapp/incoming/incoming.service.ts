@@ -137,7 +137,7 @@ export class IncomingService {
       }
 
       const history = await this.messagingService.getConversationContext(tenantId, from);
-      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history, from);
+      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history, from, salesPhone);
       if (!aiResult) return;
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResult.text });
@@ -145,10 +145,12 @@ export class IncomingService {
         await this.messagingService.sendImage(tenantId, { to: from, url: aiResult.imageUrl });
       }
       if (aiResult.vendorNotification && salesPhone) {
-        const { items, total, clientPhone } = aiResult.vendorNotification;
-        const vendorMsg = this.buildVendorMessage(clientPhone, items, total);
+        const notification = aiResult.vendorNotification;
+        const vendorMsg = notification.type === 'handoff'
+          ? this.buildHandoffMessage(notification.clientPhone, notification.summary ?? '')
+          : this.buildVendorMessage(notification.clientPhone, notification.items ?? '', notification.total ?? '');
         await this.messagingService.sendText(tenantId, { to: salesPhone, text: vendorMsg });
-        this.logger.log(`ferribot.quotation_sent tenant=${tenantId} client=${from} vendor=${salesPhone}`);
+        this.logger.log(`ferribot.vendor_notified type=${notification.type} tenant=${tenantId} client=${from} vendor=${salesPhone}`);
       }
       await this.messagingService.saveAiOutbound(tenantId, from, aiResult.text);
     } catch (err) {
@@ -159,5 +161,10 @@ export class IncomingService {
   private buildVendorMessage(clientPhone: string, items: string, total: string): string {
     const now = new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' });
     return `🔔 *Nueva cotización vía FerriBot*\n\nCliente: ${clientPhone}\n\nProductos:\n${items}\n\n*Total estimado: ${total}*\n\n_${now}_`;
+  }
+
+  private buildHandoffMessage(clientPhone: string, summary: string): string {
+    const now = new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' });
+    return `🙋 *Cliente solicita asesor — FerriBot*\n\nCliente: ${clientPhone}\n\n*Resumen:* ${summary}\n\n_${now}_`;
   }
 }

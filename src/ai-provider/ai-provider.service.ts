@@ -14,7 +14,8 @@ import { AiChatResult, AiMessage, AiTool, AiToolExecutor } from './adapters/ai-a
 import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
 import { AlgoliaService } from '../algolia/algolia.service';
 
-const WHATSAPP_BASE_PROMPT = `Eres FerriBot, asistente virtual de atención al cliente de una ferretería. Siempre identifícate como bot si te lo preguntan.
+function buildBasePrompt(salesPhone: string): string {
+  return `Eres FerriBot, asistente virtual de atención al cliente de una ferretería. Siempre identifícate como bot si te lo preguntan.
 
 REGLAS DE RESPUESTA:
 - Respuestas cortas y concretas por defecto. Solo da detalles si el cliente los pide explícitamente.
@@ -32,8 +33,11 @@ COTIZACIÓN:
 - Luego pregunta: "¿Deseas que envíe esta cotización a un asesor?"
 - Si responde que sí, llama a la herramienta send_quotation con los detalles y confirma: "✅ Cotización enviada. Un asesor te contactará pronto."
 
-HANDOFF:
-- Si el cliente pide hablar con una persona, responde: "Claro, te comunico con un asesor. Escríbenos al *0960801963* o espera que te contactemos pronto."`;
+HANDOFF AL ASESOR:
+- Cuando el cliente pida hablar con una persona, un asesor, o soporte humano, SIEMPRE llama primero a la herramienta notify_advisor con un resumen breve de lo que necesita.
+- Después de llamar notify_advisor responde: "Listo, ya avisé a nuestro equipo. En breve te contactan al *${salesPhone}* o puedes escribirles directamente."
+- NUNCA des el handoff solo con texto sin llamar notify_advisor.`;
+}
 
 const SEARCH_PRODUCTS_TOOL: AiTool = {
   name: 'search_products',
@@ -66,6 +70,21 @@ const SEND_QUOTATION_TOOL: AiTool = {
       },
     },
     required: ['items', 'total'],
+  },
+};
+
+const NOTIFY_ADVISOR_TOOL: AiTool = {
+  name: 'notify_advisor',
+  description: 'Notifica al asesor humano que un cliente solicita atención personalizada. Llama esta herramienta SIEMPRE que el cliente pida hablar con una persona, un asesor, o soporte humano.',
+  parameters: {
+    type: 'object',
+    properties: {
+      summary: {
+        type: 'string',
+        description: 'Resumen breve de lo que el cliente necesita o preguntó, para que el asesor tenga contexto antes de contactarlo.',
+      },
+    },
+    required: ['summary'],
   },
 };
 
@@ -167,6 +186,7 @@ export class AiProviderService {
     tenantId: string,
     messages: AiMessage[],
     contactPhone: string,
+    salesPhone: string | null,
   ): Promise<AiChatResult | null> {
     const entity = await this.providerRepo.findOne({ where: { tenantId, isActive: true } });
     if (!entity?.autoReply) return null;
@@ -174,7 +194,8 @@ export class AiProviderService {
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
     const adapter = AiProviderFactory.create(entity, decryptedKey);
 
-    const systemPrompt = [WHATSAPP_BASE_PROMPT, entity.systemPrompt]
+    const basePrompt = buildBasePrompt(salesPhone ?? '');
+    const systemPrompt = [basePrompt, entity.systemPrompt]
       .filter(Boolean)
       .join('\n\n');
 
@@ -193,7 +214,15 @@ export class AiProviderService {
           const total = String(args['total'] ?? 'No disponible');
           return {
             content: 'Cotización enviada al asesor.',
-            vendorNotification: { items, total, clientPhone: contactPhone },
+            vendorNotification: { type: 'quotation', items, total, clientPhone: contactPhone },
+          };
+        }
+
+        if (name === 'notify_advisor') {
+          const summary = String(args['summary'] ?? 'El cliente solicita atención de un asesor.');
+          return {
+            content: 'Asesor notificado.',
+            vendorNotification: { type: 'handoff', summary, clientPhone: contactPhone },
           };
         }
 
@@ -201,7 +230,7 @@ export class AiProviderService {
       },
     };
 
-    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL, SEND_QUOTATION_TOOL], toolExecutor);
+    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL, SEND_QUOTATION_TOOL, NOTIFY_ADVISOR_TOOL], toolExecutor);
   }
 
   private sanitize(entity: AiProviderEntity): Omit<AiProviderEntity, 'apiKey'> {

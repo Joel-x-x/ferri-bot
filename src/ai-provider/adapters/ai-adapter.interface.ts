@@ -4,9 +4,13 @@ export interface AiMessage {
 }
 
 export interface VendorNotification {
-  items: string;
-  total: string;
+  type: 'quotation' | 'handoff';
   clientPhone: string;
+  // quotation fields
+  items?: string;
+  total?: string;
+  // handoff fields
+  summary?: string;
 }
 
 export interface AiChatResult {
