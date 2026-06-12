@@ -286,11 +286,17 @@ export class MessagingService {
       .take(limit)
       .getMany();
 
-    return messages
+    const mapped: Array<{ role: 'user' | 'assistant'; content: string }> = messages
       .reverse()
       .map((m) => ({
-        role: m.direction === MessageDirection.INBOUND ? 'user' : ('assistant' as const),
+        role: (m.direction === MessageDirection.INBOUND ? 'user' : 'assistant') as 'user' | 'assistant',
         content: m.content,
       }));
+
+    // AI providers (especially Gemini) require history to start with 'user'.
+    // Drop leading assistant messages that can appear when the 20-msg window
+    // cuts off right at an outbound message.
+    const firstUserIdx = mapped.findIndex((m) => m.role === 'user');
+    return firstUserIdx > 0 ? (mapped.slice(firstUserIdx) as Array<{ role: 'user' | 'assistant'; content: string }>) : mapped;
   }
 }

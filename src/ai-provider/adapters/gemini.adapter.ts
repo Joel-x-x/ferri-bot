@@ -3,6 +3,23 @@ import { BadRequestException } from '@nestjs/common';
 import { AiAdapter, AiChatResult, AiMessage, AiTool, AiToolExecutor, VendorNotification } from './ai-adapter.interface';
 
 const MAX_TOOL_ROUNDS = 5;
+const RETRY_DELAYS_MS = [2000, 5000]; // 2s then 5s on 503
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand');
+      if (!is503 || attempt === RETRY_DELAYS_MS.length) throw err;
+      lastErr = err;
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  throw lastErr;
+}
 
 export class GeminiAdapter implements AiAdapter {
   private client: GoogleGenerativeAI;
@@ -47,7 +64,7 @@ export class GeminiAdapter implements AiAdapter {
     let nextMessage: string | Part[] = messages[messages.length - 1].content;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const result = await chat.sendMessage(nextMessage);
+      const result = await withRetry(() => chat.sendMessage(nextMessage));
       const response = result.response;
       const functionCalls = response.functionCalls();
 
@@ -72,7 +89,7 @@ export class GeminiAdapter implements AiAdapter {
     }
 
     // Fallback: last response text
-    const final = await chat.sendMessage(nextMessage);
+    const final = await withRetry(() => chat.sendMessage(nextMessage));
     return { text: final.response.text(), imageUrl, vendorNotification };
   }
 }

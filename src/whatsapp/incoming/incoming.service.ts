@@ -133,6 +133,7 @@ export class IncomingService {
         await this.messagingService.sendText(tenantId, { to: from, text: WELCOME_MESSAGE });
         await this.messagingService.saveAiOutbound(tenantId, from, WELCOME_MESSAGE);
         this.logger.log(`ferribot.welcome_sent tenant=${tenantId} to=${from}`);
+        return; // welcome IS the response for first contact
       }
 
       const history = await this.messagingService.getConversationContext(tenantId, from);
