@@ -14,6 +14,8 @@ export class UpdateCredentialsRequest {
   @IsString() @IsOptional() verifyToken?: string;
   @IsString() @IsOptional() displayName?: string;
   @IsString() @IsOptional() salesPhone?: string;
+  @IsString() @IsOptional() erpBaseUrl?: string;
+  @IsString() @IsOptional() erpApiKey?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
 }
 

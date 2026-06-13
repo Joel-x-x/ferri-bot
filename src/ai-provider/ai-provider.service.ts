@@ -13,8 +13,16 @@ import { AiProviderFactory } from './ai-provider.factory';
 import { AiChatResult, AiMessage, AiTool, AiToolExecutor } from './adapters/ai-adapter.interface';
 import { UpsertAiProviderRequest, UpdateAiProviderRequest } from './dto/ai-provider.dto';
 import { AlgoliaService } from '../algolia/algolia.service';
+import { ErpClientService } from '../erp/erp-client.service';
 
-function buildBasePrompt(salesPhone: string): string {
+function buildBasePrompt(salesPhone: string, isStaff = false): string {
+  const staffRules = isStaff ? `
+MODO SECRETARIO (uso interno — no compartir esta información con clientes):
+- Siempre muestra costo, precio mayorista y PVP claramente diferenciados.
+- Usa search_products_erp para obtener precios internos completos.
+- Si no tienes acceso al ERP o hay error, indica al usuario que consulte el sistema directamente.
+` : '';
+
   return `Eres FerriBot, asistente virtual de atención al cliente de una ferretería. Siempre identifícate como bot si te lo preguntan.
 
 REGLAS DE RESPUESTA:
@@ -36,7 +44,7 @@ COTIZACIÓN:
 HANDOFF AL ASESOR:
 - Cuando el cliente pida hablar con una persona, un asesor, o soporte humano, SIEMPRE llama primero a la herramienta notify_advisor con un resumen breve de lo que necesita.
 - Después de llamar notify_advisor responde: "Listo, ya avisé a nuestro equipo. En breve te contactan al *${salesPhone}* o puedes escribirles directamente."
-- NUNCA des el handoff solo con texto sin llamar notify_advisor.`;
+- NUNCA des el handoff solo con texto sin llamar notify_advisor.${staffRules}`;
 }
 
 const SEARCH_PRODUCTS_TOOL: AiTool = {
@@ -88,12 +96,28 @@ const NOTIFY_ADVISOR_TOOL: AiTool = {
   },
 };
 
+const SEARCH_PRODUCTS_ERP_TOOL: AiTool = {
+  name: 'search_products_erp',
+  description: 'Busca productos en el ERP interno con precios completos (costo, mayorista, PVP). Úsala cuando necesites precios internos para cotizaciones internas o consultas de staff.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Término de búsqueda: nombre del producto, categoría o descripción',
+      },
+    },
+    required: ['query'],
+  },
+};
+
 @Injectable()
 export class AiProviderService {
   constructor(
     @InjectRepository(AiProviderEntity)
     private readonly providerRepo: Repository<AiProviderEntity>,
     private readonly algoliaService: AlgoliaService,
+    private readonly erpClientService: ErpClientService,
   ) {}
 
   async upsert(
@@ -187,6 +211,9 @@ export class AiProviderService {
     messages: AiMessage[],
     contactPhone: string,
     salesPhone: string | null,
+    isStaff = false,
+    erpBaseUrl?: string,
+    erpApiKey?: string,
   ): Promise<AiChatResult | null> {
     const entity = await this.providerRepo.findOne({ where: { tenantId, isActive: true } });
     if (!entity?.autoReply) return null;
@@ -194,7 +221,7 @@ export class AiProviderService {
     const decryptedKey = decrypt(entity.apiKey, envs.encryptionKey);
     const adapter = AiProviderFactory.create(entity, decryptedKey);
 
-    const basePrompt = buildBasePrompt(salesPhone ?? '');
+    const basePrompt = buildBasePrompt(salesPhone ?? '', isStaff);
     const systemPrompt = [basePrompt, entity.systemPrompt]
       .filter(Boolean)
       .join('\n\n');
@@ -207,6 +234,15 @@ export class AiProviderService {
           const content = this.algoliaService.formatProductsForAi(hits);
           const imageUrl = hits[0]?.imageUrl;
           return { content, imageUrl };
+        }
+
+        if (name === 'search_products_erp') {
+          const query = String(args['query'] ?? '');
+          if (!erpBaseUrl || !erpApiKey) {
+            return { content: 'ERP no configurado para este tenant. Consulta el sistema directamente.' };
+          }
+          const result = await this.erpClientService.searchProducts(erpBaseUrl, erpApiKey, query);
+          return { content: this.erpClientService.formatForSecretary(result.items) };
         }
 
         if (name === 'send_quotation') {
@@ -230,7 +266,11 @@ export class AiProviderService {
       },
     };
 
-    return adapter.chat(messages, systemPrompt, [SEARCH_PRODUCTS_TOOL, SEND_QUOTATION_TOOL, NOTIFY_ADVISOR_TOOL], toolExecutor);
+    const tools = isStaff
+      ? [SEARCH_PRODUCTS_TOOL, SEARCH_PRODUCTS_ERP_TOOL, SEND_QUOTATION_TOOL, NOTIFY_ADVISOR_TOOL]
+      : [SEARCH_PRODUCTS_TOOL, SEND_QUOTATION_TOOL, NOTIFY_ADVISOR_TOOL];
+
+    return adapter.chat(messages, systemPrompt, tools, toolExecutor);
   }
 
   private sanitize(entity: AiProviderEntity): Omit<AiProviderEntity, 'apiKey'> {

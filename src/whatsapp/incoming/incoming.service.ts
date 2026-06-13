@@ -4,6 +4,7 @@ import { WebhookService } from '../webhook/webhook.service';
 import { WhatsappGateway } from '../gateway/whatsapp.gateway';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { CredentialsService } from '../credentials/credentials.service';
+import { StaffPhoneService } from '../staff/staff-phone.service';
 import { MessageType, MessageStatus } from '../../database/entities/message-history.entity';
 
 const WELCOME_MESSAGE = `¡Hola! 👋 Soy *FerriBot*, tu asistente virtual.
@@ -25,6 +26,7 @@ export class IncomingService {
     private readonly gateway: WhatsappGateway,
     private readonly aiProviderService: AiProviderService,
     private readonly credentialsService: CredentialsService,
+    private readonly staffPhoneService: StaffPhoneService,
   ) {}
 
   async verifyToken(verifyToken: string): Promise<boolean> {
@@ -53,7 +55,7 @@ export class IncomingService {
           const { tenantId } = creds;
 
           for (const msg of value?.messages ?? []) {
-            await this.handleMessage(tenantId, creds.salesPhone, msg).catch((err) =>
+            await this.handleMessage(tenantId, creds.salesPhone, creds.erpBaseUrl, creds.erpApiKey, msg).catch((err) =>
               this.logger.error(`meta.message_handling_failed tenant=${tenantId} error=${err.message}`),
             );
           }
@@ -70,7 +72,13 @@ export class IncomingService {
     }
   }
 
-  private async handleMessage(tenantId: string, salesPhone: string | null, msg: any): Promise<void> {
+  private async handleMessage(
+    tenantId: string,
+    salesPhone: string | null,
+    erpBaseUrl: string | null,
+    erpApiKey: string | null,
+    msg: any,
+  ): Promise<void> {
     const from: string = msg.from;
     const messageId: string = msg.id;
     const { type, content, mediaUrl } = this.extractContent(msg);
@@ -80,7 +88,7 @@ export class IncomingService {
     const payload = { tenantId, from, messageId, type, content, mediaUrl, timestamp: msg.timestamp };
     this.gateway.emitToTenant(tenantId, 'message:received', payload);
     await this.webhookService.dispatch(tenantId, 'message.received', payload);
-    await this.processAiReply(tenantId, from, salesPhone, content);
+    await this.processAiReply(tenantId, from, salesPhone, erpBaseUrl, erpApiKey, content);
   }
 
   private async handleStatus(tenantId: string, status: any): Promise<void> {
@@ -124,7 +132,14 @@ export class IncomingService {
     }
   }
 
-  private async processAiReply(tenantId: string, from: string, salesPhone: string | null, content?: string): Promise<void> {
+  private async processAiReply(
+    tenantId: string,
+    from: string,
+    salesPhone: string | null,
+    erpBaseUrl: string | null,
+    erpApiKey: string | null,
+    content?: string,
+  ): Promise<void> {
     if (!content) return;
 
     try {
@@ -136,8 +151,11 @@ export class IncomingService {
         return; // welcome IS the response for first contact
       }
 
+      const isStaff = await this.staffPhoneService.isStaff(tenantId, from);
       const history = await this.messagingService.getConversationContext(tenantId, from);
-      const aiResult = await this.aiProviderService.chatIfAutoReply(tenantId, history, from, salesPhone);
+      const aiResult = await this.aiProviderService.chatIfAutoReply(
+        tenantId, history, from, salesPhone, isStaff, erpBaseUrl ?? undefined, erpApiKey ?? undefined,
+      );
       if (!aiResult) return;
 
       await this.messagingService.sendText(tenantId, { to: from, text: aiResult.text });

@@ -35,6 +35,14 @@ export class MetaCredentialsEntity {
   @Column({ name: 'sales_phone', length: 20, nullable: true })
   salesPhone: string;
 
+  /** Base URL of the ERP (ferri-monolito). Example: https://api.ferridescuentos.com */
+  @Column({ name: 'erp_base_url', length: 500, nullable: true })
+  erpBaseUrl: string;
+
+  /** AES-encrypted Service API Key for ferri-monolito X-Api-Key header. */
+  @Column({ name: 'erp_api_key', type: 'text', nullable: true })
+  erpApiKey: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
