@@ -77,11 +77,18 @@ ferri-monolito ejecuta job diario → detecta cheques próximos a vencer → lla
 
 ## Endpoints en ferri-monolito (nuevos)
 
+Staff autenticado con JWT (mismos endpoints que usaría la web):
+
 ```
-POST   /internal/cheques              — registrar cheque
-GET    /internal/cheques              — listar (filtros: dueDate, status, profileId)
-GET    /internal/cheques/upcoming     — próximos a vencer (para recordatorios)
-PATCH  /internal/cheques/{id}/status  — cambiar estado (cobrado, rebotado)
+POST   /api/v1/cheques              — registrar cheque (CHEQUE_WRITE)
+GET    /api/v1/cheques              — listar (filtros: dueDate, status, issuerName) (CHEQUE_READ)
+PATCH  /api/v1/cheques/{id}/status  — cambiar estado: cobrado, rebotado (CHEQUE_WRITE)
+```
+
+Endpoint interno (API Key, para batch job de recordatorios):
+
+```
+GET    /internal/cheques/upcoming   — próximos a vencer (cron job → notificaciones push)
 ```
 
 ## Modelo de datos

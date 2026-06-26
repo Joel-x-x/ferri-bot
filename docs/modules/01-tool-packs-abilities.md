@@ -40,6 +40,10 @@ const TOOL_PRIVILEGE_MAP: Record<string, ToolDefinition> = {
   // ── Knowledge Base (ver módulo 03) ──
   'query_kb':              { privileges: [], internal: true, description: 'Consultar base de conocimiento interna' },
   'update_kb':             { privileges: ['KB_WRITE'], description: 'Agregar/actualizar entrada en KB' },
+  'delete_kb':             { privileges: ['KB_ADMIN'], description: 'Eliminar entrada de KB' },
+
+  // ── AI Memory (ver módulo 07) ──
+  'update_contact_memory': { privileges: [], description: 'Actualizar memoria del contacto (LLM auto-invoca)' },
 
   // ── Despachos (futuro) ──
   'view_my_dispatches':    { privileges: ['DISPATCH_READ'], description: 'Ver despachos asignados' },

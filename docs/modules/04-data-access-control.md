@@ -19,14 +19,14 @@ Hoy esto está hardcodeado: staff ve todo, cliente ve solo PVP. Pero con roles g
 No se filtra en el bot — se filtra en el **endpoint del monolito**. El bot pasa los privilegios del usuario, el monolito devuelve solo los campos permitidos.
 
 ```
-Bot → GET /internal/products/search?q=tornillo
-      Header: X-Authorities: PRODUCT_READ,PRODUCT_COST
+Bot → GET /api/v1/products/search?q=tornillo
+      Header: Authorization: Bearer <JWT del staff>
 
-Monolito responde según authorities:
+Monolito extrae authorities del JWT y responde según privilegios:
   - Sin PRODUCT_READ        → 403
   - PRODUCT_READ             → { name, sku, pvp, stock }
-  - PRODUCT_READ + COST_READ → { name, sku, pvp, costPrice, wholesalePrice, stock }
-  - PRODUCT_READ + COST_READ + FINANCE_READ → { + margin, taxRate, profitability }
+  - PRODUCT_READ + PRODUCT_COST → { name, sku, pvp, costPrice, wholesalePrice, stock }
+  - PRODUCT_READ + PRODUCT_COST + FINANCE_READ → { + margin, taxRate, profitability }
 ```
 
 ### Agente Externo (clientes)

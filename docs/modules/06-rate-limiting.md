@@ -8,9 +8,11 @@ Estado: **En diseño** | Fecha: 2026-06-25
 
 Un cliente puede abusar del bot: enviar cientos de mensajes, preguntas sin sentido, o intentar explotar el LLM. Esto cuesta tokens de IA y degrada el servicio. Necesitamos límites con advertencias progresivas.
 
-## Solo para Agente Externo
+## Audiencias
 
-**Staff NO tiene rate limiting.** Son empleados del tenant — si abusan, es problema del tenant, no del bot. El rate limiting protege contra clientes desconocidos.
+**Staff tiene límite alto (300/día)** — protección anti-abuso, no restricción de uso. Si un staff genera 300 mensajes IA en un día, algo anda mal.
+
+**Clientes tienen límites más estrictos** — protección contra abuso por contactos desconocidos que cuestan tokens IA.
 
 ## Límites por audiencia
 
@@ -76,35 +78,38 @@ Job cada hora: `DELETE FROM rate_limits WHERE window_start < NOW() - INTERVAL '2
 
 ```typescript
 // incoming.service.ts — antes de processAiReply()
-if (!isStaff) {
-  const rateCheck = await rateLimitService.check(tenantId, from);
+const rateCheck = await rateLimitService.check(tenantId, from, isStaff);
 
-  switch (rateCheck.status) {
-    case 'OK':
-      break;
-    case 'WARNING':
-      // Agregar nota al system prompt: "El usuario está cerca del límite"
-      break;
-    case 'SOFT_BLOCK':
-      await sendMessage(from, rateCheck.message);
-      return; // No procesar con IA
-    case 'HARD_BLOCK':
-      await alertService.notifyDev(tenantId, from, 'rate_limit_exceeded');
-      return; // Silencio total
-  }
+switch (rateCheck.status) {
+  case 'OK':
+    break;
+  case 'WARNING':
+    // Agregar nota al system prompt: "El usuario está cerca del límite"
+    break;
+  case 'SOFT_BLOCK':
+    await sendMessage(from, rateCheck.message);
+    return; // No procesar con IA
+  case 'HARD_BLOCK':
+    await alertService.notifyDev(tenantId, from, 'rate_limit_exceeded');
+    return; // Silencio total
 }
 ```
 
-## Configuración por tenant
+> `rateLimitService.check()` resuelve el límite según audiencia: staff (300), vinculado (50), no vinculado (25).
 
-```sql
--- En ai_providers o tabla nueva tenant_config
-rate_limit_daily:    INTEGER DEFAULT 100,    -- mensajes por día
-rate_limit_warning:  INTEGER DEFAULT 70,     -- cuándo advertir
-rate_limit_block_minutes: INTEGER DEFAULT 60 -- duración bloqueo
-```
+## Configuración por tenant (vía SaaS Config)
 
-Cada tenant puede ajustar según su volumen. Ferretería grande puede querer 200 mensajes/día. Pequeña puede querer 50.
+Todos los valores configurables en `saas_config` / `tenant_config` (ver módulo 12):
+
+| Key | Default | Descripción |
+|-----|---------|-------------|
+| `rate_limit_daily_default` | 25 | Msg/día para clientes no vinculados |
+| `rate_limit_daily_staff` | 300 | Msg/día para staff |
+| `rate_limit_linked_contact_multiplier` | 2 | Multiplicador para vinculados (2x = 50/día) |
+| `rate_limit_block_minutes` | 60 | Duración bloqueo temporal |
+| `rate_limit_max_blocks_before_extended` | 3 | Bloqueos antes de bloqueo extendido (24h) |
+
+Cada tenant puede ajustar dentro de los rangos definidos por SuperAdmin.
 
 ## Alertas al desarrollador
 

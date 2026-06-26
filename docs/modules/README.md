@@ -32,7 +32,7 @@ Documentos que aplican a todos los módulos:
 01 Tool Packs ←── todos los módulos registran sus tools aquí
       │
       ├── 02 Cheques (CHEQUE_READ, CHEQUE_WRITE)
-      ├── 03 Knowledge Base (KB_WRITE)
+      ├── 03 Knowledge Base (KB_WRITE, KB_ADMIN)
       ├── 04 Data Access Control (PRODUCT_COST, FINANCE_READ)
       ├── 05 Media Processing (preprocesador, no es tool RBAC)
       ├── 07 AI Memory (update_contact_memory)
@@ -41,4 +41,6 @@ Documentos que aplican a todos los módulos:
 06 Rate Limiting ←── interceptor en IncomingService, antes de todo
 09 Alerting ←── transversal, cualquier módulo puede emitir alertas
 10 Security ←── 5 capas: input → prompt → tools → output → monitoreo
+11 Auth & Sessions ←── JWT por usuario, prerequisito para tools que mutan datos
+12 SaaS Config ←── todos los módulos leen sus valores configurables de aquí
 ```

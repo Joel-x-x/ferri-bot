@@ -49,7 +49,7 @@ CREATE TABLE tenant_config (
 ## Migraciones
 
 - `V801__create_saas_config.sql` — crea ambas tablas
-- `V802__seed_saas_config_defaults.sql` — seed con 30 valores por defecto
+- `V802__seed_saas_config_defaults.sql` — seed con 32 valores por defecto
 
 ## Valores por defecto (seed)
 
@@ -64,21 +64,23 @@ CREATE TABLE tenant_config (
 | `session_validation_cache_minutes` | 5 | 1 | 30 | Cache validación sesión |
 
 ### Media Processing
-| Key | Default | Min | Max |
-|-----|---------|-----|-----|
-| `audio_max_duration_seconds` | 1800 (30m) | 10 | 3600 (1h) |
-| `audio_stt_enabled` | true | — | — |
-| `image_vision_enabled` | true | — | — |
-| `image_ocr_confirmation_required` | true | — | — |
+| Key | Default | Min | Max | Descripción |
+|-----|---------|-----|-----|-------------|
+| `audio_max_duration_seconds` | 1800 (30m) | 10 | 3600 (1h) | Duración máx audio para STT |
+| `audio_stt_enabled` | true | — | — | Habilitar Speech-to-Text |
+| `image_vision_enabled` | true | — | — | Habilitar LLM Vision para imágenes |
+| `image_ocr_confirmation_required` | true | — | — | Confirmar antes de actuar sobre OCR |
+| `stt_provider` | groq | — | — | Proveedor STT: groq, openai, google, deepgram |
+| `stt_fallback_provider` | openai | — | — | Fallback si proveedor primario falla |
 
 ### Rate Limiting
-| Key | Default | Min | Max |
-|-----|---------|-----|-----|
-| `rate_limit_daily_default` | 100 | 10 | 1000 |
-| `rate_limit_warning_threshold` | 70 | 10 | 900 |
-| `rate_limit_block_minutes` | 60 | 10 | 1440 |
-| `rate_limit_max_blocks_before_extended` | 3 | 1 | 10 |
-| `rate_limit_linked_contact_multiplier` | 2 | 1 | 5 |
+| Key | Default | Min | Max | Descripción |
+|-----|---------|-----|-----|-------------|
+| `rate_limit_daily_default` | 25 | 10 | 500 | Msg/día para clientes no vinculados |
+| `rate_limit_daily_staff` | 300 | 50 | 1000 | Msg/día para staff |
+| `rate_limit_linked_contact_multiplier` | 2 | 1 | 5 | Multiplicador para vinculados (2x = 50/día) |
+| `rate_limit_block_minutes` | 60 | 10 | 1440 | Bloqueo temporal tras exceder límite |
+| `rate_limit_max_blocks_before_extended` | 3 | 1 | 10 | Bloqueos antes de bloqueo extendido (24h) |
 
 ### AI / LLM
 | Key | Default | Min | Max |
@@ -110,11 +112,14 @@ CREATE TABLE tenant_config (
 | `welcome_message_enabled` | true | — | — |
 
 ### AI Memory
-| Key | Default | Min | Max |
-|-----|---------|-----|-----|
-| `contact_memory_enabled` | true | — | — |
-| `contact_memory_max_size_bytes` | 2048 | 512 | 8192 |
-| `contact_memory_expiry_days` | 180 | 30 | 365 |
+| Key | Default | Min | Max | Descripción |
+|-----|---------|-----|-----|-------------|
+| `contact_memory_enabled` | true | — | — | Habilitar memoria de contactos |
+| `contact_memory_max_size_bytes` | 2048 | 512 | 8192 | Tamaño máximo JSONB por contacto |
+| `contact_memory_prompt_max_chars` | 400 | 100 | 1000 | Chars máx inyectados al system prompt |
+| `cheque_reminder_days` | 5,3,1 | — | — | Días antes de vencimiento para recordatorio |
+
+> **Nota:** La memoria NO expira. Se actualiza naturalmente cuando el contacto interactúa. Borrado solo manual ("olvídame").
 
 ## Pendiente
 

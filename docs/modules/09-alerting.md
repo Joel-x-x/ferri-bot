@@ -117,6 +117,55 @@ alert_webhook_url:   VARCHAR(500),    -- webhook para alertas (Slack, etc.)
 alert_min_severity:  VARCHAR(20) DEFAULT 'warning'  -- mínimo para webhook
 ```
 
+## Modelo de datos
+
+### `conversation_events` — historial de eventos de una conversación
+
+```sql
+CREATE TABLE conversation_events (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL,
+  conversation_id UUID NOT NULL,          -- FK a conversations
+  event_type      VARCHAR(50) NOT NULL,   -- 'opened', 'resolved', 'handoff', 'rate_limit_block',
+                                          -- 'flow_started', 'flow_completed', 'flow_expired',
+                                          -- 'session_started', 'injection_detected'
+  metadata        JSONB DEFAULT '{}',     -- datos extra según tipo
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_conv_events_conversation ON conversation_events(conversation_id);
+CREATE INDEX idx_conv_events_tenant_type ON conversation_events(tenant_id, event_type);
+```
+
+### `system_alerts` — feed operativo para admin/dev
+
+```sql
+CREATE TABLE system_alerts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID,                       -- null para alertas globales (infra)
+  severity    VARCHAR(20) NOT NULL,       -- 'critical', 'warning', 'info'
+  alert_type  VARCHAR(50) NOT NULL,       -- 'api_error', 'injection', 'high_latency',
+                                          -- 'rate_limit_abuse', 'webhook_failure'
+  message     TEXT NOT NULL,
+  metadata    JSONB DEFAULT '{}',         -- contexto: phone, error, latency_ms, etc.
+  notified    BOOLEAN DEFAULT FALSE,      -- ya se envió notificación
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_system_alerts_tenant ON system_alerts(tenant_id, created_at DESC);
+CREATE INDEX idx_system_alerts_severity ON system_alerts(severity, created_at DESC);
+```
+
+### Relación entre tablas
+
+| Evento | conversation_events | system_alerts |
+|--------|:------------------:|:------------:|
+| Conversación abierta/resuelta | ✅ | — |
+| Handoff sin respuesta | ✅ | ✅ (warning) |
+| Rate limit block | ✅ | ✅ (si 3+) |
+| Prompt injection | ✅ | ✅ (critical) |
+| LLM API caída | — | ✅ (critical) |
+| Alta latencia | — | ✅ (warning) |
+| Flujo expirado | ✅ | — |
+
 ## Decisiones resueltas
 
 - [x] **Rate de alertas** → Max 1 del mismo tipo cada 15 min (configurable: `alert_rate_limit_minutes`)

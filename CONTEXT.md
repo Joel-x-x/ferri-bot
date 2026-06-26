@@ -1,6 +1,6 @@
 # FerriBot
 
-Servicio multi-tenant de atención al cliente vía WhatsApp. Soporta dos audiencias por tenant: clientes públicos (Vendedor) y staff interno (Secretario). Cada audiencia recibe herramientas y precios distintos según su identidad.
+Servicio multi-tenant de atención al cliente vía WhatsApp. Soporta dos audiencias por tenant: clientes públicos (Agente Externo) y staff interno (Agente Interno). Cada audiencia recibe herramientas y precios distintos según su identidad.
 
 ## Language
 
@@ -85,8 +85,8 @@ _Avoid_: backend client, monolito client
 | ID | Nombre | Trigger | Estado |
 |----|--------|---------|--------|
 | A | Bienvenida | Primera conversación (historial vacío) | ✅ Activo |
-| B | Búsqueda Vendedor | Contacto no-Staff pregunta por producto | ✅ Activo (Algolia) |
-| C | Búsqueda Secretario | Staff pregunta por producto | 🔨 Implementando (ERP) |
+| B | Búsqueda Agente Externo | Contacto no-Staff pregunta por producto | ✅ Activo (Algolia) |
+| C | Búsqueda Agente Interno | Staff pregunta por producto | 🔨 Implementando (ERP) |
 | D | Cotización | Contacto pide cotizar productos | Pendiente persistencia |
 | E | Handoff a humano | Contacto pide hablar con persona | ✅ Activo (notify_advisor) |
 | F | Fuera de tema | Pregunta irrelevante al catálogo | ✅ Activo |
@@ -96,8 +96,8 @@ _Avoid_: backend client, monolito client
 ```
 Mensaje entrante
   └─ isStaff(tenantId, contactPhone)?
-       ├─ YES → Secretario (ERP tools: precios costo+mayorista+PVP)
-       └─ NO  → Vendedor (Algolia tools: solo PVP)
+       ├─ YES → Agente Interno (ERP tools: precios costo+mayorista+PVP)
+       └─ NO  → Agente Externo (Algolia tools: solo PVP)
 ```
 
 Determinístico — sin LLM extra para routing. `staff_phones(tenantId, phone)` es la fuente de verdad.
@@ -108,12 +108,12 @@ Determinístico — sin LLM extra para routing. `staff_phones(tenantId, phone)` 
 2. Respuestas cortas por defecto — solo da detalles si el contacto los pide
 3. Negrillas WhatsApp pegadas al texto: `*texto*` no `* texto *`
 4. Precios siempre como "referenciales" — no garantizados
-5. **Secretario**: muestra costo, mayorista y PVP claramente diferenciados
-6. **Vendedor**: nunca menciona costo ni mayorista
+5. **Agente Interno**: muestra costo, mayorista y PVP claramente diferenciados
+6. **Agente Externo**: nunca menciona costo ni mayorista
 7. Al finalizar cotización: presenta resumen → pregunta confirmación → envía al vendedor
 
 ## Integraciones
 
 - **Meta Cloud API** — envío/recepción WhatsApp
 - **Algolia** — búsqueda Vendedor (`index: products`, filtro: `tenantId + availableForSale:true`)
-- **ferri-monolito** — ERP: autenticado con Service API Key (`X-Api-Key`), solo Secretario
+- **ferri-monolito** — ERP: staff autenticado con JWT (Sesión WhatsApp), operaciones sin usuario con API Key

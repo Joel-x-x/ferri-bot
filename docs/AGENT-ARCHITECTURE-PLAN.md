@@ -151,6 +151,42 @@ function resolveTools(authorities: string[]): Tool[] {
 ALTER TABLE staff_phones ADD COLUMN user_id UUID;
 -- No NOT NULL por migración gradual. Nuevo registro sí requiere user_id.
 
+-- conversations: schema completo (singleton por tenant+phone+channel)
+CREATE TABLE conversations (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           UUID NOT NULL,
+  phone               VARCHAR(20) NOT NULL,
+  channel             VARCHAR(20) DEFAULT 'whatsapp',
+
+  -- Estado del agente
+  agent_type          VARCHAR(20),          -- 'INTERNAL' | 'EXTERNAL'
+  status              VARCHAR(20) DEFAULT 'ACTIVE',  -- ACTIVE, RESOLVED
+
+  -- Flujo con estado (módulo híbrido)
+  flow_type           VARCHAR(50),          -- 'LINKING' | 'INVOICING' | null
+  flow_state          JSONB DEFAULT '{}',   -- estado del flujo activo
+  flow_started_at     TIMESTAMP,
+  flow_expires_at     TIMESTAMP,
+
+  -- Sesión WhatsApp (módulo 11)
+  session_token       TEXT,                 -- JWT cifrado (AES)
+  session_token_id    VARCHAR(100),         -- jti para validar
+  session_expires_at  TIMESTAMP,
+  session_user_id     UUID,
+
+  -- AI Memory (módulo 07)
+  contact_memory      JSONB DEFAULT '{}',   -- memoria resumida del contacto
+
+  -- Timestamps
+  created_at          TIMESTAMP DEFAULT NOW(),
+  updated_at          TIMESTAMP DEFAULT NOW(),
+  last_message_at     TIMESTAMP,
+  resolved_at         TIMESTAMP,
+
+  UNIQUE(tenant_id, phone, channel)
+);
+CREATE INDEX idx_conversations_tenant_phone ON conversations(tenant_id, phone);
+
 -- contact_profiles: mapeo contacto → cliente ferri-monolito
 CREATE TABLE contact_profiles (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -168,11 +204,29 @@ CREATE INDEX idx_contact_profiles_tenant_phone ON contact_profiles(tenant_id, ph
 ### ferri-monolito
 
 ```
--- Nuevo endpoint (o reutilizar existente):
+-- Nuevo endpoint:
 GET /internal/users/{userId}/authorities
   → { roles: ["GERENTE"], authorities: ["PRODUCT_READ", ...] }
   → Autenticado con Service API Key (X-Api-Key)
 ```
+
+#### Nuevos privilegios RBAC (migración pendiente)
+
+Privilegios que no existen aún en `app_privileges` y necesitan migración Flyway:
+
+| Privilegio | Módulo | Roles que lo necesitan |
+|-----------|--------|----------------------|
+| `PRODUCT_COST` | Data Access Control (04) | SELLER, GERENTE, CAJERO (Contador) |
+| `FINANCE_READ` | Data Access Control (04) | GERENTE, CAJERO (Contador) |
+| `CHEQUE_READ` | Cheques (02) | GERENTE, CAJERO, SELLER (Contador) |
+| `CHEQUE_WRITE` | Cheques (02) | GERENTE, CAJERO |
+| `KB_WRITE` | Knowledge Base (03) | GERENTE, ADMIN |
+| `KB_ADMIN` | Knowledge Base (03) | ADMIN |
+| `DISPATCH_READ` | Despachos (futuro) | GERENTE, custom Transportista |
+| `DISPATCH_WRITE` | Despachos (futuro) | GERENTE, custom Transportista |
+| `REPORT_READ` | Reportes | GERENTE |
+
+> **Migración:** Crear módulo `app_modules` + `app_privileges` + asignar a roles seed. Una sola migración Flyway en Fase 2.
 
 ---
 
@@ -182,16 +236,26 @@ El system prompt se compone dinámicamente según el agente y privilegios:
 
 ```typescript
 function buildSystemPrompt(agent: 'INTERNAL' | 'EXTERNAL', context: AgentContext): string {
-  const parts: string[] = [BASE_PROMPT];
+  const parts: string[] = [];
 
+  // 1. Reglas de seguridad (inmutables — ver módulo 10)
+  parts.push(SECURITY_RULES);
+
+  // 2. Prompt base de comportamiento
+  parts.push(BASE_PROMPT);
+
+  // 3. Extensiones por agente/rol
   if (agent === 'INTERNAL') {
     parts.push(INTERNAL_BASE_RULES);
 
-    if (context.authorities.includes('PRODUCT_READ')) {
+    if (context.authorities.includes('PRODUCT_COST')) {
       parts.push(PRICING_RULES);  // "Muestra costo, mayorista y PVP diferenciados"
     }
     if (context.authorities.includes('INVENTORY_READ')) {
       parts.push(INVENTORY_RULES);  // "Reporta stock por bodega"
+    }
+    if (context.authorities.includes('FINANCE_READ')) {
+      parts.push(FINANCE_RULES);  // "Incluye margen de utilidad y desglose IVA"
     }
     if (context.authorities.includes('REPORT_READ')) {
       parts.push(REPORT_RULES);  // "Genera resúmenes de ventas"
@@ -204,10 +268,21 @@ function buildSystemPrompt(agent: 'INTERNAL' | 'EXTERNAL', context: AgentContext
     }
   }
 
-  parts.push(context.tenantCustomPrompt);  // system prompt custom del tenant
+  // 4. Prompt del tenant (sandboxed — no puede sobreescribir reglas de seguridad)
+  if (context.tenantCustomPrompt) {
+    parts.push(`## REGLAS DE NEGOCIO DEL TENANT\n${context.tenantCustomPrompt}`);
+  }
+
+  // 5. Memoria del contacto (~400 chars max)
+  if (context.contactMemory) {
+    parts.push(`## CONTEXTO DEL CONTACTO\n${formatMemory(context.contactMemory)}`);
+  }
+
   return parts.join('\n\n');
 }
 ```
+
+Orden de composición: `SECURITY_RULES → BASE_PROMPT → ROLE_EXTENSIONS → tenant prompt → contact memory`. Las reglas de seguridad van primero y son inmutables (ver módulo 10).
 
 ---
 
@@ -299,7 +374,11 @@ ferri-bot/src/
 
 ## Decisiones pendientes
 
-- [ ] ¿Cómo se maneja el handoff cuando el Staff cambia de contexto? (ej: gerente pregunta por stock y luego por reportes en la misma conversación)
+(Ninguna — todas resueltas en grill session 2026-06-25)
+
+### Handoff de contexto (resuelto)
+
+**No hay handoff entre tools.** El LLM maneja cambios de contexto naturalmente dentro de la misma conversación. Si el gerente pregunta por stock y luego por reportes, el LLM tiene ambos tools disponibles simultáneamente y elige el correcto según la pregunta. No es un cambio de "agente" — ambos tools están en el mismo Tool Pack del gerente.
 
 ## Módulos documentados
 
@@ -318,3 +397,4 @@ Documentación detallada por módulo en `docs/modules/`:
 | 09 | Alerting | Monitoreo y alertas por anomalías |
 | 10 | Security | 5 capas de defensa contra prompt injection y abuso |
 | 11 | Auth & Sessions | JWT por usuario vía Google OAuth / OTP. Gestión de sesiones desde web |
+| 12 | SaaS Config | Config en cascada: SuperAdmin defaults → Tenant overrides. Tablas creadas |
