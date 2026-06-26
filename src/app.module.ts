@@ -10,6 +10,7 @@ import { AiProviderModule } from './ai-provider/ai-provider.module';
 import { HealthModule } from './health/health.module';
 import { StaffPhoneModule } from './whatsapp/staff/staff-phone.module';
 import { AgentModule } from './agent/agent.module';
+import { MediaModule } from './media/media.module';
 import { envs } from './config/envs';
 
 @Module({
@@ -28,6 +29,7 @@ import { envs } from './config/envs';
     AiProviderModule,
     StaffPhoneModule,
     AgentModule,
+    MediaModule,
     HealthModule,
   ],
 })

@@ -6,7 +6,10 @@ import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import { StaffPhoneService } from '../staff/staff-phone.service';
 import { AgentResolverService } from '../../agent/agent-resolver.service';
+import { MetaMediaService } from '../../media/meta-media.service';
+import { SttService } from '../../media/stt.service';
 import { MessageType, MessageStatus } from '../../database/entities/message-history.entity';
+import { envs } from '../../config/envs';
 
 const WELCOME_MESSAGE = `¡Hola! 👋 Soy *FerriBot*, tu asistente virtual.
 
@@ -29,6 +32,8 @@ export class IncomingService {
     private readonly credentialsService: CredentialsService,
     private readonly staffPhoneService: StaffPhoneService,
     private readonly agentResolver: AgentResolverService,
+    private readonly metaMediaService: MetaMediaService,
+    private readonly sttService: SttService,
   ) {}
 
   async verifyToken(verifyToken: string): Promise<boolean> {
@@ -85,12 +90,18 @@ export class IncomingService {
     const messageId: string = msg.id;
     const { type, content, mediaUrl } = this.extractContent(msg);
 
-    await this.messagingService.saveInbound(tenantId, from, messageId, type, content, mediaUrl);
+    // Transcribe audio to text (transparent to LLM)
+    let processedContent = content;
+    if (type === MessageType.AUDIO && mediaUrl && envs.stt.enabled) {
+      processedContent = await this.transcribeAudio(tenantId, mediaUrl);
+    }
 
-    const payload = { tenantId, from, messageId, type, content, mediaUrl, timestamp: msg.timestamp };
+    await this.messagingService.saveInbound(tenantId, from, messageId, type, processedContent ?? content, mediaUrl);
+
+    const payload = { tenantId, from, messageId, type, content: processedContent ?? content, mediaUrl, timestamp: msg.timestamp };
     this.gateway.emitToTenant(tenantId, 'message:received', payload);
     await this.webhookService.dispatch(tenantId, 'message.received', payload);
-    await this.processAiReply(tenantId, from, salesPhone, erpBaseUrl, erpApiKey, content);
+    await this.processAiReply(tenantId, from, salesPhone, erpBaseUrl, erpApiKey, processedContent);
   }
 
   private async handleStatus(tenantId: string, status: any): Promise<void> {
@@ -202,5 +213,21 @@ export class IncomingService {
   private buildHandoffMessage(clientPhone: string, summary: string): string {
     const now = new Date().toLocaleString('es-EC', { timeZone: 'America/Guayaquil' });
     return `🙋 *Cliente solicita asesor — FerriBot*\n\nCliente: ${clientPhone}\n\n*Resumen:* ${summary}\n\n_${now}_`;
+  }
+
+  private async transcribeAudio(tenantId: string, mediaId: string): Promise<string | null> {
+    try {
+      const { accessToken } = await this.credentialsService.findByTenant(tenantId);
+      const { buffer, mimeType } = await this.metaMediaService.downloadMedia(mediaId, accessToken);
+      const transcription = await this.sttService.transcribe(buffer, mimeType);
+
+      if (transcription) {
+        this.logger.log(`stt.transcribed tenant=${tenantId} chars=${transcription.length}`);
+      }
+      return transcription;
+    } catch (err) {
+      this.logger.warn(`stt.failed tenant=${tenantId} mediaId=${mediaId} error=${err.message}`);
+      return null;
+    }
   }
 }

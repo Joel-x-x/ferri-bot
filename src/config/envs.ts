@@ -25,6 +25,12 @@ const schema = Joi.object({
   ALGOLIA_SEARCH_KEY: Joi.string().required(),
   ALGOLIA_INDEX_NAME: Joi.string().default('products'),
 
+  GROQ_API_KEY: Joi.string().allow('').optional(),
+  OPENAI_API_KEY: Joi.string().allow('').optional(),
+  STT_PROVIDER: Joi.string().valid('groq', 'openai').default('groq'),
+  STT_FALLBACK_PROVIDER: Joi.string().valid('groq', 'openai').default('openai'),
+  STT_ENABLED: Joi.boolean().default(true),
+
 });
 
 const { error, value } = schema.validate(process.env, { allowUnknown: true });
@@ -61,5 +67,11 @@ export const envs = {
     appId: value.ALGOLIA_APP_ID as string,
     searchKey: value.ALGOLIA_SEARCH_KEY as string,
     indexName: value.ALGOLIA_INDEX_NAME as string,
+  },
+
+  stt: {
+    provider: value.STT_PROVIDER as string,
+    fallbackProvider: value.STT_FALLBACK_PROVIDER as string,
+    enabled: value.STT_ENABLED as boolean,
   },
 };
