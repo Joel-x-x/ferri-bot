@@ -5,6 +5,7 @@ import { WhatsappGateway } from '../gateway/whatsapp.gateway';
 import { AiProviderService } from '../../ai-provider/ai-provider.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import { StaffPhoneService } from '../staff/staff-phone.service';
+import { AgentResolverService } from '../../agent/agent-resolver.service';
 import { MessageType, MessageStatus } from '../../database/entities/message-history.entity';
 
 const WELCOME_MESSAGE = `¡Hola! 👋 Soy *FerriBot*, tu asistente virtual.
@@ -27,6 +28,7 @@ export class IncomingService {
     private readonly aiProviderService: AiProviderService,
     private readonly credentialsService: CredentialsService,
     private readonly staffPhoneService: StaffPhoneService,
+    private readonly agentResolver: AgentResolverService,
   ) {}
 
   async verifyToken(verifyToken: string): Promise<boolean> {
@@ -148,13 +150,29 @@ export class IncomingService {
         await this.messagingService.sendText(tenantId, { to: from, text: WELCOME_MESSAGE });
         await this.messagingService.saveAiOutbound(tenantId, from, WELCOME_MESSAGE);
         this.logger.log(`ferribot.welcome_sent tenant=${tenantId} to=${from}`);
-        return; // welcome IS the response for first contact
+        return;
       }
 
       const isStaff = await this.staffPhoneService.isStaff(tenantId, from);
+
+      const agent = this.agentResolver.resolve({
+        tenantId,
+        contactPhone: from,
+        salesPhone,
+        isStaff,
+        authorities: isStaff ? ['PRODUCT_READ'] : [],
+        isLinkedContact: false,
+        erpBaseUrl: erpBaseUrl ?? undefined,
+        erpApiKey: erpApiKey ?? undefined,
+      });
+
       const history = await this.messagingService.getConversationContext(tenantId, from);
-      const aiResult = await this.aiProviderService.chatIfAutoReply(
-        tenantId, history, from, salesPhone, isStaff, erpBaseUrl ?? undefined, erpApiKey ?? undefined,
+      const aiResult = await this.aiProviderService.chatWithAgent(
+        tenantId,
+        history,
+        agent.systemPrompt,
+        agent.tools,
+        agent.toolExecutor,
       );
       if (!aiResult) return;
 

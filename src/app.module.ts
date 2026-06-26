@@ -9,6 +9,7 @@ import { GatewayModule } from './whatsapp/gateway/gateway.module';
 import { AiProviderModule } from './ai-provider/ai-provider.module';
 import { HealthModule } from './health/health.module';
 import { StaffPhoneModule } from './whatsapp/staff/staff-phone.module';
+import { AgentModule } from './agent/agent.module';
 import { envs } from './config/envs';
 
 @Module({
@@ -26,6 +27,7 @@ import { envs } from './config/envs';
     WebhookModule,
     AiProviderModule,
     StaffPhoneModule,
+    AgentModule,
     HealthModule,
   ],
 })

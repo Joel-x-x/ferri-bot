@@ -7,9 +7,10 @@ import { GatewayModule } from '../gateway/gateway.module';
 import { AiProviderModule } from '../../ai-provider/ai-provider.module';
 import { CredentialsModule } from '../credentials/credentials.module';
 import { StaffPhoneModule } from '../staff/staff-phone.module';
+import { AgentModule } from '../../agent/agent.module';
 
 @Module({
-  imports: [MessagingModule, WebhookModule, GatewayModule, AiProviderModule, CredentialsModule, StaffPhoneModule],
+  imports: [MessagingModule, WebhookModule, GatewayModule, AiProviderModule, CredentialsModule, StaffPhoneModule, AgentModule],
   controllers: [MetaWebhookController],
   providers: [IncomingService],
 })
